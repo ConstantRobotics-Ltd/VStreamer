@@ -111,8 +111,8 @@ public:
 
     /**
      * @brief Encode params. Method doesn't encode initString.
-     * @param data Pointer to data buffer. Must have at least 99 bytes size.
-     * @param bufferSize Size of data buffer. Min value is 99.
+     * @param data Pointer to data buffer. Must have at least 130 bytes size.
+     * @param bufferSize Size of data buffer.
      * @param size Size of data.
      * @param mask Pointer to parameters mask.
      * @return TRUE if params encoded or FALSE if not.
@@ -172,9 +172,11 @@ enum class VStreamerParam
     CODEC,
     /// Scaling mode: 0 - fit, 1 - cut.
     FIT_MODE,
+    /// Cycle time, mksec. Calculated by RTSP server.
+    CYCLE_TIME_MKSEC,
     /// Overlay mode: false - off, true - on.
     OVERLAY_MODE,
-    /// TYPE of the streamer
+    /// Type of the streamer
     TYPE,
     /// Custom parameter 1.
     CUSTOM1,
@@ -187,7 +189,7 @@ enum class VStreamerParam
 
 
 /**
- * @brief Enum of VSteamer commands.
+ * @brief Enum of VSteamer action commands.
  */
 enum class VStreamerCommand
 {
@@ -195,7 +197,7 @@ enum class VStreamerCommand
     RESTART = 1,
     /// Enable. Equal to MODE param.
     ON,
-    /// Disable. Equal to MODE params.
+    /// Disable. Equal to MODE param.
     OFF
 };
 
