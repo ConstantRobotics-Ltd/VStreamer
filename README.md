@@ -629,7 +629,7 @@ public:
 
 ## Serialize video streamer params
 
-**VStreamerParams** class provides method **encode(...)** to serialize video streamer params (fields of VStreamerParams class, see Table 4). Serialization of video streamer params necessary in case when you need to send video streamer params via communication channels. Method provides options to exclude particular parameters from serialization. To do this method inserts binary mask (4 bytes) where each bit represents particular parameter and **decode(...)** method recognizes it. Method declaration:
+**VStreamerParams** class provides method **encode(...)** to serialize video streamer params (fields of VStreamerParams class). Serialization of video streamer params necessary in case when you need to send video streamer params via communication channels. Method provides options to exclude particular parameters from serialization. To do this method inserts binary mask (4 bytes) where each bit represents particular parameter and **decode(...)** method recognizes it. Method declaration:
 
 ```cpp
  bool encode(uint8_t* data, int bufferSize, int& size, VStreamerParamsMask* mask = nullptr);
