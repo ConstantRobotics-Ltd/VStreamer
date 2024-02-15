@@ -14,13 +14,12 @@
 - [Versions](#Versions)
 - [Library files](#Library-files)
 - [Video streamer interface class description](#Video-streamer-interface-class-description)
-  - [Class declaration](#VStreamer-class-declaration)
+  - [Class declaration](#Class-declaration)
   - [getVersion method](#getVersion-method)
   - [initVStreamer method](#initVStreamer-method)
   - [isVStreamerInit method](#isVStreamerInit-method)
   - [closeVStreamer method](#closeVStreamer-method)
   - [setParam method](#setParam-method)
-  - [getParam method](#getParam-method)
   - [getParams method](#getParams-method)
   - [executeCommand method](#executeCommand-method)
   - [encodeSetParamCommand method](#encodeSetParamCommand-method)
@@ -31,7 +30,7 @@
   - [VStreamerCommand enum](#VStreamerCommand-enum)
   - [VStreamerParam enum](#VStreamerParam-enum)
 - [VStreamerParams class description](#VStreamerParams-class-description)
-  - [VStreamerParams class declaration](#VStreamerParams-class-declaration)
+  - [Class declaration](#Class--declaration)
   - [Serialize video streamer params](#Serialize-video-streamer-params)
   - [Deserialize video streamer params](#Deserialize-video-streamer-params)
   - [Read params from JSON file and write to JSON file](#Read-params-from-JSON-file-and-write-to-JSON-file)
@@ -42,7 +41,7 @@
 
 # Overview
 
-**VStreamer** C++ library provides standard interface as well defines data structures and rules for different video stream classes. **VStreamer** interface class doesn't do anything, just provides interface and provides methods to encode/decode commands and encode/decode params. Also **VStreamer** class provides data structures for video stream parameters. Different video stream classes inherit interface form **VStreamer** C++ class. **VStreamer.h** file contains contains list of data structures ([VStreamCommand](#VStreamCommand-enum) enum, [VStreamParam](#VStreamParam-enum) enum and [VStreamParams](#VStreamParams-class-description) class). [VStreamParams](#VStreamParams-class-description) class contains video stream params and includes methods to encode and decode video stream params.  [VStreamCommand](#VStreamCommand-enum) enum contains IDs of commands supported by **VStreamer** class. [VStreamParam](#VStreamParam-enum) enum contains IDs of params supported by **VStreamer** class. All video streams should include params and commands listed in **VStreamer.h** file. **VStreamer** class interface class depends on classes such as : [Frame](https://github.com/ConstantRobotics-Ltd/Frame) class describes video frame and video frame data structures, [ConfigReader](https://github.com/ConstantRobotics-Ltd/ConfigReader) library provides methods to read/write JSON config files, [VCodec](https://github.com/ConstantRobotics-Ltd/VCodec) interface library for integrating codec implementations in case raw frame streaming, [VOverlay](https://github.com/ConstantRobotics-Ltd/VOverlay) interface library for integrating overlay engines in case raw frame streaming. The library uses C++17 standard.
+**VStreamer** C++ library provides standard interface as well defines data structures and rules for different video stream classes. **VStreamer** interface class doesn't do anything, just provides interface and methods to encode/decode commands and encode/decode params. Also **VStreamer** class provides data structures for video stream parameters. Different video stream classes inherit interface form **VStreamer** C++ class. **VStreamer.h** file contains list of data structures ([VStreamCommand](#VStreamCommand-enum) enum, [VStreamParam](#VStreamParam-enum) enum and [VStreamParams](#VStreamParams-class-description) class). [VStreamParams](#VStreamParams-class-description) class contains video stream params and includes methods to encode and decode params. [VStreamCommand](#VStreamCommand-enum) enum contains IDs of commands supported by **VStreamer** class. [VStreamParam](#VStreamParam-enum) enum contains IDs of params supported by **VStreamer** class. All video streamers should include params and commands listed in **VStreamer.h** file. **VStreamer** class interface class depends on: [Frame](https://github.com/ConstantRobotics-Ltd/Frame) class describes video frame and video frame data structures, [ConfigReader](https://github.com/ConstantRobotics-Ltd/ConfigReader) library provides methods to read/write JSON config files, [VCodec](https://github.com/ConstantRobotics-Ltd/VCodec) interface library for integrating codec implementations in case raw frame streaming, [VOverlay](https://github.com/ConstantRobotics-Ltd/VOverlay) interface library for integrating overlay engines in case raw frame streaming. The library uses C++17 standard.
 
 
 
@@ -103,10 +102,10 @@ public:
     /// Class destructor.
     virtual ~VStreamer();
 
-    /// Get library version.
+    /// Get string of current library version.
     static std::string getVersion();
 
-    /// Initialize video streamer.
+    /// Init video streamer.
     virtual bool initVStreamer(VStreamerParams &params,
                                VCodec *codec = nullptr,
                                VOverlay *overlay = nullptr) = 0;
@@ -117,27 +116,22 @@ public:
     /// Close video streamer.
     virtual void closeVStreamer() = 0;
 
-    /// Send frame.
+    /// Send frame to video streamer.
     virtual bool sendFrame(Frame& frame) = 0;
 
-    /// Set parameter with int type.
-    virtual bool setParam(VStreamerParam id, float value) = 0;
+    /// Set video streamer param.
+    virtual bool setParam(VStreamerParam id, float value1, std::string value2 = "") = 0;
 
-    /// Set parameter with string type.
-    virtual bool setParam(VStreamerParam id, std::string value) = 0;
-
-    /// Get parameter with float type.
-    virtual float getParam(VStreamerParam id) = 0;
-
-    /// Get parameters (VStreamerParams).
+    /// Get video streamer params structure.
     virtual void getParams(VStreamerParams& params) = 0;
 
     /// Execute command.
     virtual bool executeCommand(VStreamerCommand id) = 0;
 
-    /// Encode parameter.
+    /// Encode set param command.
     static void encodeSetParamCommand(
-            uint8_t* data, int& size, VStreamerParam id, float value);
+            uint8_t* data, int& size, VStreamerParam id,
+            float value1, std::string value2 = "");
 
     /// Encode command.
     static void encodeCommand(
@@ -148,9 +142,10 @@ public:
                              int size,
                              VStreamerParam& paramId,
                              VStreamerCommand& commandId,
-                             float& value);
-
-    /// Decode and execute command
+                             float& value1,
+                             std::string& value1);
+    
+    /// Decode and execute command.
     virtual bool decodeAndExecuteCommand(uint8_t* data, int size) = 0;
 };
 ```
@@ -185,15 +180,15 @@ VStreamer class version: 1.0.0
 
 ```cpp
 virtual bool initVStreamer(VStreamerParams &params,
-                            VCodec *codec = nullptr,
-                            VOverlay *overlay = nullptr) = 0;
+                           VCodec *codec = nullptr,
+                           VOverlay *overlay = nullptr) = 0;
 ```
 
 | Parameter | Value                                                        |
 | --------- | ------------------------------------------------------------ |
 | params    | [VStreamerParams](#VStreamParams-class-description) class object. The video streamer should set parameters according to params structure. Particular video streamer might not support all parameters listed in [VStreamerParams](#VStreamParams-class-description) class. |
-| codec      | Pinter [VCodec](https://github.com/ConstantRobotics-Ltd/VCodec) object. Used for encoding video in case RAW input frame data. |
-| overlay    | Pointer to [VOverlay](https://github.com/ConstantRobotics-Ltd/VOverlay) object. Used to overlay information on video. |
+| codec      | Pinter [VCodec](https://github.com/ConstantRobotics-Ltd/VCodec) object. Used for encoding video in case RAW input frame data. If user set pointer to **nullptr** the video streamer can process only compressed input video frames. |
+| overlay    | Pointer to [VOverlay](https://github.com/ConstantRobotics-Ltd/VOverlay) object. Used to overlay information on video in case if user put RAW input frame data to the streamer. If user set pointer to **nullptr** the video streamer will not be able overlay any information on video. |
 
 **Returns:** TRUE if the video streamer initialized or FALSE if not.
 
@@ -213,7 +208,7 @@ virtual bool isVStreamerInit() = 0;
 
 ## closeVStreamer method
 
-**closeVStreamer()** method closes video streamer. Method stops all thread and release memory. Method declaration:
+**closeVStreamer()** method closes video streamer. Method stops all thread and releases memory. Method declaration:
 
 ```cpp
 virtual void closeVStreamer() = 0;
@@ -223,7 +218,7 @@ virtual void closeVStreamer() = 0;
 
 ## sendFrame method
 
-**sendFrame(...)** method intended to send frame to clients. Method declaration:
+**sendFrame(...)** method intended to send frame to clients. To provide video stream the user must call this method for every video frame coming from video source. In case processing RAW video frames streamer must rescale video (if necessary) and overlay information (if pointer to video overlay class set in [initVStreamer(...)](#initVStreamer-method) method). Method declaration:
 
 ```cpp
 virtual bool sendFrame(Frame& frame) = 0;
@@ -231,49 +226,33 @@ virtual bool sendFrame(Frame& frame) = 0;
 
 | Parameter | Value                                                        |
 | --------- | ------------------------------------------------------------ |
-| frame     | Video frame to send (see [**Frame**](https://github.com/ConstantRobotics-Ltd/Frame) class description). Particular streamers can support RAW video frames or(and) compressed video frames. |
+| frame     | [Frame](https://github.com/ConstantRobotics-Ltd/Frame) class object. Particular streamers can support RAW video frames or(and) compressed video frames. |
 
-**Returns:** TRUE if frame sent or FALSE if not.
+**Returns:** TRUE if frame sent (accepted by streamer) or FALSE if not.
 
 
 
 ## setParam method
 
-**setParam(...)** method sets video stream parameter new value. The particular implementation of the video stream must provide thread-safe **setParam(...)** method call. This means that the **setParam(...)** method can be safely called from any thread. Method declaration:
+**setParam(...)** method sets new value of video stream parameter. The particular implementation of the video streamer must provide thread-safe **setParam(...)** method call. This means that the **setParam(...)** method can be safely called from any thread. Method declaration:
 
 ```cpp
-virtual bool setParam(VStreamerParam id, float value) = 0;
-virtual bool setParam(VStreamerParam id, std::string value) = 0;
+virtual bool setParam(VStreamerParam id, float value1, std::string value2 = "") = 0;
 ```
 
 | Parameter | Description                                                  |
 | --------- | ------------------------------------------------------------ |
 | id        | Video stream parameter ID according to [VStreamParam](#VStreamParam-enum) enum. |
-| value     | Video stream parameter value. Value type can be either int or string, it depends on parameter ID. |
+| value1    | Numeral video streamer parameter value. Only for non string parameters. For string parameters (see [VStreamParam](#VStreamParam-enum) enum) this parameters may have any values. |
+| value2    | String parameter value (see [VStreamParam](#VStreamParam-enum) enum). |
 
 **Returns:** TRUE is the parameter was set or FALSE if not.
 
 
 
-## getParam method
-
-**getParam(...)** returns video stream parameter value. The particular implementation of the video stream must provide thread-safe **getParam(...)** method call. This means that the **getParam(...)** method can be safely called from any thread. **Note:** There is no getParam for string type parameters. Method declaration:
-
-```cpp
-virtual float getParam(VStreamerParam id) = 0;
-```
-
-| Parameter | Description                                                  |
-| --------- | ------------------------------------------------------------ |
-| id        | Video stream parameter ID according to [**VStreamParam enum**](#VStreamParam-enum). |
-
-**Returns:** parameter value or -1 of the parameters doesn't exist in particular video stream class.
-
-
-
 ## getParams method
 
-**getParams(...)** method to obtain video stream params class. The particular implementation of the video stream must provide thread-safe **getParams(...)** method call. This means that the **getParams(...)** method can be safely called from any thread. Method declaration:
+**getParams(...)** method to obtain video streamer params class. The particular implementation of the video streamer must provide thread-safe **getParams(...)** method call. This means that the **getParams(...)** method can be safely called from any thread. Method declaration:
 
 ```cpp
 virtual void getParams(VStreamerParams& params) = 0;
@@ -295,7 +274,7 @@ virtual bool executeCommand(VStreamerCommand id) = 0;
 
 | Parameter | Description                                                  |
 | --------- | ------------------------------------------------------------ |
-| id        | Video stream command ID according to [VStreamCommand enum](#VStreamCommand-enum) enum. |
+| id        | Video stream command ID according to [VStreamCommand](#VStreamCommand-enum) enum. |
 
 **Returns:** TRUE is the command was executed or FALSE if not.
 
@@ -306,7 +285,9 @@ virtual bool executeCommand(VStreamerCommand id) = 0;
 **encodeSetParamCommand(...)** static method to encode command to change any parameter for remote video streamer. To control video streamer remotely, the developer has to design his own protocol and according to it encode the command and deliver it over the communication channel. To simplify this, the **VStreamer** class contains static methods for encoding the control command. The **VStreamer** class provides two types of commands: a parameter change command (SET_PARAM) and an action command (COMMAND). **encodeSetParamCommand(...)** designed to encode SET_PARAM command. Method declaration:
 
 ```cpp
-static void encodeSetParamCommand(uint8_t* data, int& size, VStreamerParam id, float value);
+static void encodeSetParamCommand(
+            uint8_t* data, int& size, VStreamerParam id,
+            float value1, std::string value2 = "");
 ```
 
 | Parameter | Description                                                  |
@@ -314,24 +295,8 @@ static void encodeSetParamCommand(uint8_t* data, int& size, VStreamerParam id, f
 | data      | Pointer to data buffer for encoded command. Must have size >= 11. |
 | size      | Size of encoded data. Will be minimum 11 bytes.              |
 | id        | Parameter ID according to [VStreamerParam](#VStreamerParam-enum) enum. |
-| value     | Parameter value.                                             |
-
-**Table 2** - *SET_PARAM* command format:.
-
-
-| Byte | Value | Description                                        |
-| ---- | ----- | -------------------------------------------------- |
-| 0    | 0x01  | SET_PARAM command header value.                    |
-| 1    | Major | Major version of VStreamer class.                  |
-| 2    | Minor | Minor version of VStreamer class.                  |
-| 3    | id    | Parameter ID **int32_t** in Little-endian format.  |
-| 4    | id    | Parameter ID **int32_t** in Little-endian format.  |
-| 5    | id    | Parameter ID **int32_t** in Little-endian format.  |
-| 6    | id    | Parameter ID **int32_t** in Little-endian format.  |
-| 7    | value | Parameter value **float** in Little-endian format. |
-| 8    | value | Parameter value **float** in Little-endian format. |
-| 9    | value | Parameter value **float** in Little-endian format. |
-| 10   | value | Parameter value **float** in Little-endian format. |
+| value1    | Numeral video streamer parameter value. Only for non string parameters. For string parameters (see [VStreamParam](#VStreamParam-enum) enum) this parameters may have any values. |
+| value2    | String parameter value (see [VStreamParam](#VStreamParam-enum) enum). |
 
 **encodeSetParamCommand(...)** is static and used without **VStreamer** class instance. This method used on client side (control system). Command encoding example:
 
@@ -362,18 +327,6 @@ static void encodeCommand(uint8_t* data, int& size, VStreamerCommand id);
 | size      | Size of encoded data. Will be 7 bytes.                       |
 | id        | Command ID according to [**VStreamerCommand enum**](#VStreamerCommand-enum). |
 
-**Table 3** - *COMMAND* format:
-
-| Byte | Value | Description                                     |
-| ---- | ----- | ----------------------------------------------- |
-| 0    | 0x00  | COMMAND header value.                           |
-| 1    | Major | Major version of VStreamer class.               |
-| 2    | Minor | Minor version of VStreamer class.               |
-| 3    | id    | Command ID **int32_t** in Little-endian format. |
-| 4    | id    | Command ID **int32_t** in Little-endian format. |
-| 5    | id    | Command ID **int32_t** in Little-endian format. |
-| 6    | id    | Command ID **int32_t** in Little-endian format. |
-
 **encodeCommand(...)** is static and used without **VStreamer** class instance. This method used on client side (control system). Command encoding example:
 
 ```cpp
@@ -396,7 +349,8 @@ static int decodeCommand(uint8_t* data,
                          int size,
                          VStreamerParam& paramId,
                          VStreamerCommand& commandId,
-                         float& value);
+                         float& value1,
+                         std::string& value1);
 ```
 
 | Parameter | Description                                                  |
@@ -405,7 +359,8 @@ static int decodeCommand(uint8_t* data,
 | size      | Size of command. Should be 11 bytes for SET_PARAM and 7 bytes for COMMAND. |
 | paramId   | Parameter ID according to [VStreamerParam](#VStreamerParam-enum) enum. After decoding SET_PARAM command the method will return parameter ID. |
 | commandId | Command ID according to [VStreamerCommand](#VStreamerCommand-enum) enum. After decoding COMMAND the method will return command ID. |
-| value     | Parameter value (after decoding SET_PARAM command).          |
+| value1    | Numeral video streamer parameter value. Only for non string parameters. For string parameters (see [VStreamParam](#VStreamParam-enum) enum) this parameters may have any values. |
+| value2    | String parameter value (see [VStreamParam](#VStreamParam-enum) enum). |
 
 **Returns:** **0** - in case decoding COMMAND, **1** - in case decoding SET_PARAM command or **-1** in case errors.
 
@@ -413,7 +368,7 @@ static int decodeCommand(uint8_t* data,
 
 ## decodeAndExecuteCommand method
 
-**decodeAndExecuteCommand(...)** method decodes and executes command on video streamer side. The particular implementation of the video streamer must provide thread-safe **decodeAndExecuteCommand(...)** method call. This means that the **decodeAndExecuteCommand(...)** method can be safely called from any thread. Method declaration:
+**decodeAndExecuteCommand(...)** method decodes and executes command encoded by [encodeSetParamCommand(...)](#encodeSetParamCommand-method) and [encodeCommand(...)](#encodeCommand-method) methods on video streamer side. The particular implementation of the video streamer must provide thread-safe **decodeAndExecuteCommand(...)** method call. This means that the **decodeAndExecuteCommand(...)** method can be safely called from any thread. Method declaration:
 
 ```cpp
 virtual bool decodeAndExecuteCommand(uint8_t* data, int size) = 0;
@@ -521,25 +476,25 @@ enum class VStreamerParam
 | Parameter     | Description                                                  |
 | ------------  | ------------------------------------------------------------ |
 | MODE          | Enable/disable streamer (0 - disabled, 1 - enabled). |
-| WIDTH         | Frame width. |
-| HEIGHT        | Frame height.|
+| WIDTH         | Frame width. Regardless of the resolution of the input video, if RAW data is processed, the streamer should scale the images according to this parameter. |
+| HEIGHT        | Frame height. Regardless of the resolution of the input video, if RAW data is processed, the streamer should scale the images according to this parameter. |
 | IP            | Streamer's ip. |
-| PORT          | Streamer's port. |
+| PORT          | Streamer's port. It can be TCP or UDP port depends on implementation. |
 | USER          | User name for auth (for example, in case RTSP stream). |
 | PASSWORD      | Password name for auth (for example, in case RTSP stream). |
 | SUFFIX        | Stream name in case RTSP stream. |
-| MIN_BITRATE_KBPS  | Minimum bitrate for variable bitrate encoding in case raw frame stream. |
-| MAX_BITRATE_KBPS  | Maximum bitrate for variable bitrate encoding in case raw frame stream. |
-| BITRATE_KBPS      | Bitrate for constant bitrate encoding in case raw frame stream. |
-| BITRATE_MODE  | Enable/disable variable bitrate (0 - constant bitrate, 1 - variable bitrate). |
-| FPS           | Streamer's fps and also encoding fps in case raw frame stream. |
-| GOP           | Codec gop size in case of raw frame stream.                    |
-| H264_PROFILE  | H264 encoding profile in case of raw frame stream.             |
-| JPEG_QUALITY  | JPEG encoding quality in case of raw frame stream.             |
-| CODEC         | Codec type for encoding raw frames.                            |
-| FIT_MODE      | Scaling mode (0 - fit, 1 - cut) in case of raw frame stream. |
-| OVERLAY_MODE  | Overlay enable/disable (0 - disabled, 1 - enabled) in case of raw frame stream.  |
-| CYCLE_TIME_MKSEC | Read only. Cycle timeout, microseconds. |
+| MIN_BITRATE_KBPS  | Minimum bitrate for variable bitrate encoding in case RAW input video frames. |
+| MAX_BITRATE_KBPS  | Maximum bitrate for variable bitrate encoding in case RAW input video frames. |
+| BITRATE_KBPS      | Bitrate for constant bitrate encoding in case RAW input video frames. |
+| BITRATE_MODE  | Enable/disable variable bitrate. Values depends on implementation but it is recommended to use default values: **0** - constant bitrate, **1** - variable bitrate. |
+| FPS           | Streamer's fps and also encoding fps in case RAW input video frames. Regardless of the input video frame rate, the streamer must provide the specified FPS. If the FPS value is 0, the streamer must provide FPS equal to the input video frame rate. |
+| GOP           | Codec gop size in case in case RAW input video frames. |
+| H264_PROFILE  | H264 encoding profile in case RAW input video frames. |
+| JPEG_QUALITY  | JPEG encoding quality in case RAW input video frames. |
+| CODEC         | Codec type for encoding RAW frames.                   |
+| FIT_MODE      | Scaling mode. Values depends on implementation but it is recommended to use default values: **0** - fit, **1** - crop. in case RAW input video frames. |
+| OVERLAY_MODE  | Overlay enable/disable in case RAW input video frames. Values depends on implementation but it is recommended to use default values: **0** - disable, **1** - enable. |
+| CYCLE_TIME_MKSEC | **Read only.** Cycle timeout, microseconds. |
 | TYPE  | Type of streamer. Depends on implementation. |
 | CUSTOM1  | Custom parameter. Depends on implementation.    |
 | CUSTOM2  | Custom parameter. Depends on implementation.    |
@@ -551,9 +506,9 @@ enum class VStreamerParam
 
 
 
-## VStreamerParams class declaration
+## Class  declaration
 
-**VStreamerParams** class used for video stream initialization (**initVStreamer(...)** method) or to get all actual params (**getParams()** method). Also **VStreamerParams** provide structure to write/read params from JSON files (**JSON_READABLE** macro, see [**ConfigReader**](https://github.com/ConstantRobotics-Ltd/ConfigReader) class description) and provide methods to encode and decode params. Class declaration:
+**VStreamerParams** class used for video stream initialization ([initVStreamer(...)](#initVStreamer-method) method) or to get all actual params ([getParams(...)](#getParams-method) method). Also **VStreamerParams** provides structure to write/read params from JSON files (**JSON_READABLE** macro, see [ConfigReader](https://github.com/ConstantRobotics-Ltd/ConfigReader) class description) and provide methods to encode and decode params. Class declaration:
 
 ```cpp
 class VStreamerParams
@@ -922,16 +877,13 @@ class CustomVStreamer: public VStreamer
 {
 public:
     
-    /// Class destructor.
-    ~CustomVStreamer();
-
-    /// Get library version.
+    /// Get string of current library version.
     static std::string getVersion();
 
-    /// Initialize video streamer.
+    /// Init video streamer.
     bool initVStreamer(VStreamerParams &params,
-                               VOverlay *overlay = nullptr,
-                               VCodec *codec = nullptr);
+                       VCodec *codec = nullptr,
+                       VOverlay *overlay = nullptr);
 
     /// Get initialization status.
     bool isVStreamerInit();
@@ -940,27 +892,23 @@ public:
     void closeVStreamer();
 
     /// Send frame to video streamer.
-    bool sendFrame(Frame& frame);
+    bool sendFrame(Frame& frame)
 
-    /// Set parameter with int type.
-    bool setParam(VStreamerParam id, float value);
+    /// Set video streamer param.
+    bool setParam(VStreamerParam id, float value1,
+                  std::string value2 = "");
 
-    /// Set parameter with string type.
-    bool setParam(VStreamerParam id, std::string value);
-
-    /// Get parameter with float type.
-    float getParam(VStreamerParam id);
-
-    /// Get parameters (VStreamerParams).
+    /// Get video streamer params structure.
     void getParams(VStreamerParams& params);
 
     /// Execute command.
     bool executeCommand(VStreamerCommand id);
-
-    /// Decode and execute command
+    
+    /// Decode and execute command.
     bool decodeAndExecuteCommand(uint8_t* data, int size);
 
 private:
+    
     /// Video streamer params.
     VStreamerParams m_params;
 };
