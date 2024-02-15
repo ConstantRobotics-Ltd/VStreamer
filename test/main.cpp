@@ -3,7 +3,6 @@
 
 
 
-/// Link namesapces.
 using namespace cr::video;
 using namespace std;
 
@@ -26,7 +25,6 @@ bool jsonReadWriteTest();
 
 
 
-// Entry point.
 int main(void)
 {
     cout << "#####################################" << endl;
@@ -76,7 +74,6 @@ int main(void)
 
 
 
-// Copy test.
 bool copyTest()
 {
     // Prepare random params.
@@ -214,17 +211,17 @@ bool copyTest()
         cout << "in.type" << endl;
         return false;
     }
-    if(in.custom1 != out.custom1)
+    if (in.custom1 != out.custom1)
     {
         cout << "in.custom1" << std::endl;
         return false;
     }
-    if(in.custom2 != out.custom2)
+    if (in.custom2 != out.custom2)
     {
         cout << "in.custom2" << std::endl;
         return false;
     }
-    if(in.custom3 != out.custom3)
+    if (in.custom3 != out.custom3)
     {
         cout << "in.custom3" << std::endl;
         return false;
@@ -235,7 +232,6 @@ bool copyTest()
 
 
 
-// Encode/decode test.
 bool encodeDecodeTest()
 {
     // Prepare random params.
@@ -279,7 +275,7 @@ bool encodeDecodeTest()
         return false;
     }
 
-       // Compare params.
+    // Compare params.
     if (in.enable != out.enable)
     {
         cout << "in.enable" << endl;
@@ -385,17 +381,17 @@ bool encodeDecodeTest()
         cout << "in.type" << endl;
         return false;
     }
-    if((int)in.custom1 != (int)out.custom1)
+    if ((int)in.custom1 != (int)out.custom1)
     {
         cout << "in.custom1" << endl;
         return false;
     }
-    if(in.custom2 != out.custom2)
+    if (in.custom2 != out.custom2)
     {
         cout << "in.custom2" << endl;
         return false;
     }
-    if(in.custom3 != out.custom3)
+    if (in.custom3 != out.custom3)
     {
         cout << "in.custom3" << endl;
         return false;
@@ -406,7 +402,6 @@ bool encodeDecodeTest()
 
 
 
-// Encode/decode commands test.
 bool encodeDecodeCommandsTest()
 {
     // Encode command.
@@ -461,7 +456,6 @@ bool encodeDecodeCommandsTest()
 
 
 
-/// JSON read/write test.
 bool jsonReadWriteTest()
 {
     // Prepare random params.
@@ -489,7 +483,6 @@ bool jsonReadWriteTest()
     in.custom2 = rand() % 255;
     in.custom3 = rand() % 255;
 
-
     // Write params to file.
     cr::utils::ConfigReader inConfig;
     inConfig.set(in, "vStreamerParams");
@@ -497,14 +490,14 @@ bool jsonReadWriteTest()
 
     // Read params from file.
     cr::utils::ConfigReader outConfig;
-    if(!outConfig.readFromFile("TestVStreamerParams.json"))
+    if (!outConfig.readFromFile("TestVStreamerParams.json"))
     {
         cout << "Can't open config file" << endl;
         return false;
     }
 
     VStreamerParams out;
-    if(!outConfig.get(out, "vStreamerParams"))
+    if (!outConfig.get(out, "vStreamerParams"))
     {
         cout << "Can't read params from file" << endl;
         return false;
@@ -611,28 +604,27 @@ bool jsonReadWriteTest()
         cout << "in.type" << endl;
         return false;
     }
-    if(in.custom1 != out.custom1)
+    if (in.custom1 != out.custom1)
     {
         cout << "in.custom1" << endl;
         return false;
     }
-    if(in.custom2 != out.custom2)
+    if (in.custom2 != out.custom2)
     {
         cout << "in.custom2" << endl;
         return false;
     }
-    if(in.custom3 != out.custom3)
+    if (in.custom3 != out.custom3)
     {
         cout << "in.custom3" << endl;
         return false;
     }
-    
+
     return true;
 }
 
 
 
-/// Encode/decode test with params mask.
 bool encodeDecodeWithMaskTest()
 {
     // Prepare random params.
@@ -809,17 +801,17 @@ bool encodeDecodeWithMaskTest()
         cout << "in.type" << endl;
         return false;
     }
-    if(-1 != out.custom1)
+    if (-1 != out.custom1)
     {
         cout << "in.custom1" << endl;
         return false;
     }
-    if(in.custom2 != out.custom2)
+    if (in.custom2 != out.custom2)
     {
         cout << "in.custom2" << endl;
         return false;
-    }    
-    if(-1 != out.custom3)
+    }
+    if (-1 != out.custom3)
     {
         cout << "in.custom3" << endl;
         return false;
