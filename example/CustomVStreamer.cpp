@@ -42,6 +42,14 @@ void cr::video::CustomVStreamer::closeVStreamer()
 
 
 
+bool cr::video::CustomVStreamer::sendFrame(Frame& frame)
+{
+    // Send frame here.
+    return true;
+}
+
+
+
 bool cr::video::CustomVStreamer::setParam(VStreamerParam id, float value)
 {
     return true;

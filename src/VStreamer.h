@@ -221,16 +221,16 @@ public:
     /**
      * @brief Init video streamer. All params will be set according to structure.
      * @param params Video streamer parameters structure.
-     * @param overlay Pointer to overlay object (in case raw frame streaming).
      * @param codec Pointer to codec object (in case raw frame streaming).
+     * @param overlay Pointer to overlay object (in case raw frame streaming).
      * @return TRUE if the video streamer init or FALSE if not.
      */
     virtual bool initVStreamer(VStreamerParams &params,
-                               VOverlay *overlay = nullptr,
-                               VCodec *codec = nullptr) = 0;
+                               VCodec *codec = nullptr,
+                               VOverlay *overlay = nullptr) = 0;
 
     /**
-     * @brief Get open status.
+     * @brief Get init status.
      * @return TRUE if video streamer init or FALSE if not.
      */
     virtual bool isVStreamerInit() = 0;
@@ -239,6 +239,12 @@ public:
      * @brief Close video streamer.
      */
     virtual void closeVStreamer() = 0;
+
+    /**
+     * @brief Send frame to video streamer.
+     * @param frame Pointer to frame object.
+     */
+    virtual bool sendFrame(Frame& frame) = 0;
 
     /**
      * @brief Set video streamer param.

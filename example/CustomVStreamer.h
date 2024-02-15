@@ -7,7 +7,7 @@ namespace cr
 {
 namespace video
 {
-/// Custom video stremer class.
+/// Custom video streamer class.
 class CustomVStreamer: public VStreamer
 {
 public:
@@ -44,6 +44,12 @@ public:
      * @brief Close video streamer.
      */
     void closeVStreamer();
+
+    /**
+     * @brief Send frame to video streamer.
+     * @param frame Pointer to frame object.
+     */
+    bool sendFrame(Frame& frame);
 
     /**
      * @brief Set video streamer param.
@@ -93,8 +99,7 @@ private:
 
     /// Video source params.
     VStreamerParams m_params;
-    /// Output frame.
-    Frame m_outputFrame;
+
 };
 }
 }
