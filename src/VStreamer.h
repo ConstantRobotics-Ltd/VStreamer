@@ -295,6 +295,16 @@ public:
             uint8_t* data, int& size, VStreamerParam id, float value);
 
     /**
+     * @brief Encode set param command.
+     * @param data Pointer to data buffer. Must have size >= 11.
+     * @param size Size of encoded data.
+     * @param id Parameter id.
+     * @param value Parameter value.
+     */
+    static void encodeSetParamCommand(
+            uint8_t* data, int& size, VStreamerParam id, std::string value);
+
+    /**
      * @brief Encode command.
      * @param data Pointer to data buffer. Must have size >= 11.
      * @param size Size of encoded data.
@@ -317,6 +327,21 @@ public:
                              VStreamerParam& paramId,
                              VStreamerCommand& commandId,
                              float& value);
+
+    /**
+     * @brief Decode command.
+     * @param data Pointer to command data.
+     * @param size Size of data.
+     * @param paramId Output command ID.
+     * @param commandId Output command ID.
+     * @param value Param or command value.
+     * @return 0 - command decoded, 1 - set param command decoded, -1 - error.
+     */
+    static int decodeCommand(uint8_t* data,
+                             int size,
+                             VStreamerParam& paramId,
+                             VStreamerCommand& commandId,
+                             std::string& value);
 
     /**
      * @brief Decode and execute command.
