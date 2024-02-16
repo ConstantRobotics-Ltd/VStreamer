@@ -57,13 +57,6 @@ bool cr::video::CustomVStreamer::setParam(VStreamerParam id, float value)
 
 
 
-float cr::video::CustomVStreamer::getParam(VStreamerParam id)
-{
-    return 0.0f;
-}
-
-
-
 void cr::video::CustomVStreamer::getParams(VStreamerParams& params)
 {
     params = m_params;
