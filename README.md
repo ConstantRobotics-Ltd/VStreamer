@@ -237,17 +237,17 @@ virtual bool sendFrame(Frame& frame) = 0;
 
 ## setParam method
 
-**setParam(...)** method sets new value of video stream parameter. The particular implementation of the video streamer must provide thread-safe **setParam(...)** method call. This means that the **setParam(...)** method can be safely called from any thread. Method declaration:
+**setParam(...)** method sets new value of video stream parameter. The particular implementation of the video streamer must provide thread-safe **setParam(...)** method call. This means that the **setParam(...)** method can be safely called from any thread. Also, method has two overloaded version that depends on type of value. Method declaration:
 
 ```cpp
-virtual bool setParam(VStreamerParam id, float value1, std::string value2 = "") = 0;
+virtual bool setParam(VStreamerParam id, float value) = 0;
+virtual bool setParam(VStreamerParam id, std::string value) = 0;
 ```
 
 | Parameter | Description                                                  |
 | --------- | ------------------------------------------------------------ |
 | id        | Video stream parameter ID according to [VStreamParam](#VStreamParam-enum) enum. |
-| value1    | Numeral video streamer parameter value. Only for non string parameters. For string parameters (see [VStreamParam](#VStreamParam-enum) enum) this parameters may have any values. |
-| value2    | String parameter value (see [VStreamParam](#VStreamParam-enum) enum). |
+| value     | Value of parameter. It can be either string or int type. it depends on parameter. |
 
 **Returns:** TRUE is the parameter was set or FALSE if not.
 
