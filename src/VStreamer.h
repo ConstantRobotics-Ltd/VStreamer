@@ -265,13 +265,6 @@ public:
     virtual bool setParam(VStreamerParam id, std::string value) = 0;
 
     /**
-     * @brief Get video streamer param value.
-     * @param id Parameter ID.
-     * @return Parameter value or -1.
-     */
-    virtual float getParam(VStreamerParam id) = 0;
-
-    /**
      * @brief Get video streamer params structure.
      * @param params Video streamer params class object.
      */
