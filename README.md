@@ -12,7 +12,7 @@
 
 - [Overview](#Overview)
 - [Versions](#Versions)
-- [Library files](#Library-files)
+- [Library files](#library-files)
 - [Video streamer interface class description](#Video-streamer-interface-class-description)
   - [Class declaration](#Class-declaration)
   - [getVersion method](#getVersion-method)
