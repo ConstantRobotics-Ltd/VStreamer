@@ -88,32 +88,3 @@ bool cr::video::CustomVStreamer::executeCommand(VStreamerCommand id)
 
     return false;
 }
-
-
-
-bool cr::video::CustomVStreamer::decodeAndExecuteCommand(uint8_t* data, int size)
-{
-    // Decode command.
-    VStreamerCommand commandId = VStreamerCommand::RESTART;
-    VStreamerParam paramId = VStreamerParam::FIT_MODE;
-    float value = 0.0f;
-    switch (VStreamer::decodeCommand(data, size, paramId, commandId, value))
-    {
-    // COMMAND.
-    case 0:
-        // Executte command.
-        return executeCommand(commandId);
-    // SET_PARAM.
-    case 1:
-    {
-        // Set param.
-        return setParam(paramId, value);
-    }
-    default:
-    {
-        return false;
-    }
-    }
-
-    return false;
-}

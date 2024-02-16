@@ -414,7 +414,8 @@ bool encodeDecodeCommandsTest()
     VStreamerCommand commandId;
     VStreamerParam paramId;
     float value = 0.0f;
-    if (VStreamer::decodeCommand(data, size, paramId, commandId, value) != 0)
+    std::string strValue = "";
+    if (VStreamer::decodeCommand(data, size, paramId, commandId, value, strValue) == -1)
     {
         cout << "Command not decoded" << endl;
         return false;
@@ -433,7 +434,8 @@ bool encodeDecodeCommandsTest()
 
     // Decode command.
     value = 0.0f;
-    if (VStreamer::decodeCommand(data, size, paramId, commandId, value) != 1)
+    strValue = "";
+    if (VStreamer::decodeCommand(data, size, paramId, commandId, value, strValue) != 1)
     {
         cout << "Set param command not decoded" << endl;
         return false;

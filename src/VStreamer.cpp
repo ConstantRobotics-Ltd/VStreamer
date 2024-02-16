@@ -861,7 +861,7 @@ void encodeSetParamCommand(
     uint8_t* data, int& size, VStreamerParam id, std::string value)
 {
     // Fill header.
-    data[0] = 0x01;
+    data[0] = 0x02;
     data[1] = VSTREAMER_MAJOR_VERSION;
     data[2] = VSTREAMER_MINOR_VERSION;
 
@@ -895,7 +895,8 @@ int cr::video::VStreamer::decodeCommand(uint8_t *data,
                                         int size,
                                         cr::video::VStreamerParam &paramId,
                                         cr::video::VStreamerCommand &commandId,
-                                        float &value)
+                                        float &value,
+                                        string &strValue)
 {
     // Check size.
     if (size < 7)
@@ -909,6 +910,7 @@ int cr::video::VStreamer::decodeCommand(uint8_t *data,
     int id = 0;
     memcpy(&id, &data[3], 4);
     value = 0.0f;
+    strValue = "";
 
     // Check command type.
     if (data[0] == 0x00)
@@ -926,49 +928,44 @@ int cr::video::VStreamer::decodeCommand(uint8_t *data,
         memcpy(&value, &data[7], 4);
         return 1;
     }
-
-    return -1;
-}
-
-int cr::video::VStreamer::decodeCommand(uint8_t *data,
-                                        int size,
-                                        cr::video::VStreamerParam &paramId,
-                                        cr::video::VStreamerCommand &commandId,
-                                        string &value)
-{
-    // Check size.
-    if (size < 7)
-        return -1;
-
-    // Check version.
-    if (data[1] != VSTREAMER_MAJOR_VERSION || data[2] != VSTREAMER_MINOR_VERSION)
-        return -1;
-
-    // Extract data.
-    int id = 0;
-    memcpy(&id, &data[3], 4);
-    value = "";
-
-    // Check command type.
-    if (data[0] == 0x00)
+    else if(data[0] == 0x02)
     {
-        commandId = (VStreamerCommand)id;
-        return 0;
-    }
-    else if (data[0] == 0x01)
-    {
-        // Check size.
-        if (size < 7)
-            return false;
+        // We can't check size here because we don't know the size of string.
 
         paramId = (VStreamerParam)id;
 
         char *tempVal = new char[50]; // 50 is enough big for any array.
         strcpy(tempVal, (char *)&data[7]);
-        value = std::string(tempVal);
-        return 1;
+        strValue = std::string(tempVal);
+        return 2;
     }
 
     return -1;
-    
+}
+
+
+
+bool cr::video::VStreamer::decodeAndExecuteCommand(uint8_t* data, int size)
+{
+    // Decode command.
+    VStreamerCommand commandId = VStreamerCommand::RESTART; // any value.
+    VStreamerParam paramId = VStreamerParam::FIT_MODE; // any value.
+    float value = 0.0f;
+    std::string strValue = "";
+    switch (VStreamer::decodeCommand(data, size, paramId, commandId, value, strValue))
+    {
+    // COMMAND.
+    case 0:
+        return executeCommand(commandId);
+    // SET_PARAM.
+    case 1:
+        return setParam(paramId, value);
+    // SET_PARAM_STR.
+    case 2:
+        return setParam(paramId, strValue);
+    default:
+        return false;
+    }
+
+    return false;
 }

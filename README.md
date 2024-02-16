@@ -119,14 +119,20 @@ public:
     /// Send frame to video streamer.
     virtual bool sendFrame(Frame& frame) = 0;
 
-    /// Set video streamer param.
-    virtual bool setParam(VStreamerParam id, float value1, std::string value2 = "") = 0;
+    /// Set video streamer param with int type value.
+    virtual bool setParam(VStreamerParam id, float value) = 0;
+
+    /// Set video streamer param with string type value.
+    virtual bool setParam(VStreamerParam id, std::string value) = 0;
 
     /// Get video streamer params structure.
     virtual void getParams(VStreamerParams& params) = 0;
 
     /// Execute command.
     virtual bool executeCommand(VStreamerCommand id) = 0;
+
+    /// Decode and execute command.
+    virtual bool decodeAndExecuteCommand(uint8_t* data, int size);
 
     /// Encode set param command.
     static void encodeSetParamCommand(
@@ -144,9 +150,6 @@ public:
                              VStreamerCommand& commandId,
                              float& value1,
                              std::string& value1);
-    
-    /// Decode and execute command.
-    virtual bool decodeAndExecuteCommand(uint8_t* data, int size) = 0;
 };
 ```
 
@@ -280,6 +283,23 @@ virtual bool executeCommand(VStreamerCommand id) = 0;
 
 
 
+## decodeAndExecuteCommand method
+
+**decodeAndExecuteCommand(...)** method decodes and executes command encoded by [encodeSetParamCommand(...)](#encodeSetParamCommand-method) and [encodeCommand(...)](#encodeCommand-method) methods on video streamer side. It is a virtual method which means if implementation does not define it, default definition from **VStreamer** class will be used. The particular implementation of the video streamer must provide thread-safe **setParam(...)** and **executeCommand(...)** method calls to make default definition of **decodeAndExecuteCommand(...)** thread-safe. This means that the **decodeAndExecuteCommand(...)** method can be safely called from any thread. Method declaration:
+
+```cpp
+virtual bool decodeAndExecuteCommand(uint8_t* data, int size);
+```
+
+| Parameter | Description                                                  |
+| --------- | ------------------------------------------------------------ |
+| data      | Pointer to input command.                                    |
+| size      | Size of command. Must be min 11 bytes for SET_PARAM and 7 bytes for COMMAND. |
+
+**Returns:** TRUE if command decoded (SET_PARAM or COMMAND) and executed (action command or set param command).
+
+
+
 ## encodeSetParamCommand method
 
 **encodeSetParamCommand(...)** static method to encode command to change any parameter for remote video streamer. To control video streamer remotely, the developer has to design his own protocol and according to it encode the command and deliver it over the communication channel. To simplify this, the **VStreamer** class contains static methods for encoding the control command. The **VStreamer** class provides two types of commands: a parameter change command (SET_PARAM) and an action command (COMMAND). **encodeSetParamCommand(...)** designed to encode SET_PARAM command. Method declaration:
@@ -363,23 +383,6 @@ static int decodeCommand(uint8_t* data,
 | value2    | String parameter value (see [VStreamParam](#VStreamParam-enum) enum). |
 
 **Returns:** **0** - in case decoding COMMAND, **1** - in case decoding SET_PARAM command or **-1** in case errors.
-
-
-
-## decodeAndExecuteCommand method
-
-**decodeAndExecuteCommand(...)** method decodes and executes command encoded by [encodeSetParamCommand(...)](#encodeSetParamCommand-method) and [encodeCommand(...)](#encodeCommand-method) methods on video streamer side. The particular implementation of the video streamer must provide thread-safe **decodeAndExecuteCommand(...)** method call. This means that the **decodeAndExecuteCommand(...)** method can be safely called from any thread. Method declaration:
-
-```cpp
-virtual bool decodeAndExecuteCommand(uint8_t* data, int size) = 0;
-```
-
-| Parameter | Description                                                  |
-| --------- | ------------------------------------------------------------ |
-| data      | Pointer to input command.                                    |
-| size      | Size of command. Must be min 11 bytes for SET_PARAM and 7 bytes for COMMAND. |
-
-**Returns:** TRUE if command decoded (SET_PARAM or COMMAND) and executed (action command or set param command).
 
 
 
