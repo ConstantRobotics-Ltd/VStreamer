@@ -897,18 +897,17 @@ public:
     /// Send frame to video streamer.
     bool sendFrame(Frame& frame)
 
-    /// Set video streamer param.
-    bool setParam(VStreamerParam id, float value1,
-                  std::string value2 = "");
+    /// Set video streamer param with int value.
+    bool setParam(VStreamerParam id, float value);
+
+    /// Set video streamer param with string value.
+    bool setParam(VStreamerParam id, string value);
 
     /// Get video streamer params structure.
     void getParams(VStreamerParams& params);
 
     /// Execute command.
     bool executeCommand(VStreamerCommand id);
-    
-    /// Decode and execute command.
-    bool decodeAndExecuteCommand(uint8_t* data, int size);
 
 private:
     
