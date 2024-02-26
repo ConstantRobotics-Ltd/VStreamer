@@ -83,6 +83,8 @@ bool copyTest()
     in.height = rand() % 255;
     in.ip = "afhjaskdm";
     in.port = rand() % 255;
+    in.multicastIp = "afhjaskdm";
+    in.multicastPort = rand() % 255;
     in.user = "afhidsjfnm";
     in.password = "adafsodjf";
     in.suffix = "asdasdasd";
@@ -129,6 +131,16 @@ bool copyTest()
     if (in.port != out.port)
     {
         cout << "in.port" << endl;
+        return false;
+    }
+    if (in.multicastIp != out.multicastIp)
+    {
+        cout << "in.multicastIp" << endl;
+        return false;
+    }
+    if (in.multicastPort != out.multicastPort)
+    {
+        cout << "in.multicastPort" << endl;
         return false;
     }
     if (in.user != out.user)
@@ -241,6 +253,8 @@ bool encodeDecodeTest()
     in.height = rand() % 255;
     in.ip = "afhjaskdm";
     in.port = rand() % 255;
+    in.multicastIp = "afhjaskdmasd";
+    in.multicastPort = rand() % 255;
     in.user = "afhidsjfnm";
     in.password = "adafsodjf";
     in.suffix = "asdasdasd";
@@ -299,6 +313,16 @@ bool encodeDecodeTest()
     if (in.port != out.port)
     {
         cout << "in.port" << endl;
+        return false;
+    }
+    if (in.multicastIp != out.multicastIp)
+    {
+        cout << "in.multicastIp" << endl;
+        return false;
+    }
+    if (in.multicastPort != out.multicastPort)
+    {
+        cout << "in.multicastPort" << endl;
         return false;
     }
     if (in.user != out.user)
@@ -467,6 +491,8 @@ bool jsonReadWriteTest()
     in.height = rand() % 255;
     in.ip = "afhjaskdm";
     in.port = rand() % 255;
+    in.multicastIp = "afhjaskdmasd";
+    in.multicastPort = rand() % 255;
     in.user = "afhidsjfnm";
     in.password = "adafsodjf";
     in.suffix = "asdasdasd";
@@ -529,6 +555,16 @@ bool jsonReadWriteTest()
     if (in.port != out.port)
     {
         cout << "in.port" << endl;
+        return false;
+    }
+    if (in.multicastIp != out.multicastIp)
+    {
+        cout << "in.multicastIp" << endl;
+        return false;
+    }
+    if (in.multicastPort != out.multicastPort)
+    {
+        cout << "in.multicastPort" << endl;
         return false;
     }
     if (in.user != out.user)
@@ -636,6 +672,8 @@ bool encodeDecodeWithMaskTest()
     in.height = rand() % 255;
     in.ip = "afhjaskdm";
     in.port = rand() % 255;
+    in.multicastIp = "afhjaskdmasd";
+    in.multicastPort = rand() % 255;
     in.user = "afhidsjfnm";
     in.password = "adafsodjf";
     in.suffix = "asdasdasd";
@@ -662,6 +700,8 @@ bool encodeDecodeWithMaskTest()
     mask.height = true;
     mask.ip = false;
     mask.port = true;
+    mask.multicastIp = false;
+    mask.multicastPort = true;
     mask.user = false;
     mask.password = true;
     mask.suffix = false;
@@ -721,6 +761,16 @@ bool encodeDecodeWithMaskTest()
     if (in.port != out.port)
     {
         cout << "in.port" << endl;
+        return false;
+    }
+    if ("" != out.multicastIp)
+    {
+        cout << "in.multicastIp" << endl;
+        return false;
+    }
+    if (in.multicastPort != out.multicastPort)
+    {
+        cout << "in.multicastPort" << endl;
         return false;
     }
     if ("" != out.user)

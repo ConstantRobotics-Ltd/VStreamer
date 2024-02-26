@@ -38,6 +38,8 @@ VStreamerParams &VStreamerParams::operator=(const VStreamerParams &src)
     height = src.height;
     ip = src.ip;
     port = src.port;
+    multicastIp = src.multicastIp;
+    multicastPort = src.multicastPort;
     user = src.user;
     password = src.password;
     suffix = src.suffix;
@@ -319,6 +321,24 @@ bool VStreamerParams::encode(uint8_t *data, int bufferSize, int &size, VStreamer
         pos += sizeof(int);
         data[6] |= (1 << 7);
 
+        if (bufferSize < pos + multicastIp.size() + 1)
+        {
+            size = pos;
+            return true;
+        }
+        memcpy(&data[pos], multicastIp.c_str(), multicastIp.size() + 1);
+        pos += multicastIp.size() + 1;
+        data[6] |= (1 << 6);
+
+        if (bufferSize < pos + sizeof(int))
+        {
+            size = pos;
+            return true;
+        }
+        memcpy(&data[pos], &multicastPort, sizeof(int));
+        pos += sizeof(int);
+        data[6] |= (1 << 5);
+
         size = pos;
         return true;
     }
@@ -494,6 +514,20 @@ bool VStreamerParams::encode(uint8_t *data, int bufferSize, int &size, VStreamer
         memcpy(&data[pos], &tempCustom3, sizeof(int));
         pos += sizeof(int);
         data[6] |= (1 << 7);
+    }
+
+    if (mask->multicastIp && (bufferSize > pos + multicastIp.size() + 1))
+    {
+        memcpy(&data[pos], multicastIp.c_str(), multicastIp.size() + 1);
+        pos += multicastIp.size() + 1;
+        data[6] |= (1 << 6);
+    }
+
+    if (mask->multicastPort && (bufferSize > pos + sizeof(int)))
+    {
+        memcpy(&data[pos], &multicastPort, sizeof(int));
+        pos += sizeof(int);
+        data[6] |= (1 << 5);
     }
 
     size = pos;
@@ -834,6 +868,32 @@ bool VStreamerParams::decode(uint8_t *data, int dataSize)
     {
         custom3 = -1;
     }
+
+    if (checkBit(data[6], 6))
+    {
+        char *tempVal = new char[50]; // 50 is enough big for any array.
+        strcpy(tempVal, (char *)&data[pos]);
+        pos += strlen(tempVal) + 1;
+        multicastIp = tempVal;
+        delete[] tempVal;
+    }
+    else
+    {
+        multicastIp = "";
+    }
+
+    if (checkBit(data[6], 5))
+    {
+        if (dataSize < pos + sizeInt)
+            return false;
+        memcpy(&multicastPort, &data[pos], sizeInt);
+        pos += sizeInt;
+    }
+    else
+    {
+        multicastPort = -1;
+    }
+
 
     return true;
 }

@@ -4,7 +4,7 @@
 
 # **VStreamer interface C++ library**
 
-**v1.0.0**
+**v1.1.0**
 
 
 
@@ -52,6 +52,7 @@
 | Version | Release date | What's new                    |
 | ------- | ------------ | ----------------------------- |
 | 1.0.0   | 15.02.2024   | First version of the library. |
+| 1.1.0   | 26.02.2024   | New parameters added for multicast streaming. |
 
 
 
@@ -172,7 +173,7 @@ std::cout << "VStreamer class version: " << VStreamer::getVersion() << std::endl
 Console output:
 
 ```bash
-VStreamer class version: 1.0.0
+VStreamer class version: 1.1.0
 ```
 
 
@@ -435,6 +436,10 @@ enum class VStreamerParam
     IP,
     /// Streamer port.
     PORT,
+    /// Streamer multicast IP.
+    MULTICAST_IP,
+    /// Streamer multicast port.
+    MULTICAST_PORT,
     /// Streamer user (for rtsp streaming): "" - no user.
     USER,
     /// Streamer password (for rtsp streaming): "" - no password.
@@ -483,6 +488,8 @@ enum class VStreamerParam
 | HEIGHT        | Frame height. Regardless of the resolution of the input video, if RAW data is processed, the streamer should scale the images according to this parameter. |
 | IP            | Streamer's ip. |
 | PORT          | Streamer's port. It can be TCP or UDP port depends on implementation. |
+| MULTICAST_IP   | Streamer's multicast ip. |
+| MULTICAST_PORT | Streamer's multicast port. It is UDP port.|
 | USER          | User name for auth (for example, in case RTSP stream). |
 | PASSWORD      | Password name for auth (for example, in case RTSP stream). |
 | SUFFIX        | Stream name in case RTSP stream. |
@@ -527,6 +534,10 @@ public:
     std::string ip{"127.0.0.1"};
     /// Streamer port.
     int port{8554};
+    /// Streamer multicast IP.
+    std::string multicastIp{"224.1.0.1"};
+    /// Streamer multicast port.
+    int multicastPort{18000};
     /// Streamer user (for rtsp streaming): "" - no user.
     std::string user{""};
     /// Streamer password (for rtsp streaming): "" - no password.
@@ -610,6 +621,8 @@ struct VStreamerParamsMask
     bool height{true};
     bool ip{true};
     bool port{true};
+    bool multicastIp{true};
+    bool multicastPort{true};
     bool user{true};
     bool password{true};
     bool suffix{true};
@@ -728,29 +741,31 @@ if(!outConfig.readFromFile("TestVStreamerParams.json"))
 {
     "vStreamerParams": 
     {
-        "bitrateKbps": 226,
-        "bitrateMode": 180,
+        "bitrateKbps": 207,
+        "bitrateMode": 206,
         "codec": "eydiucnksa",
-        "custom1": 61.0,
-        "custom2": 39.0,
-        "custom3": 223.0,
+        "custom1": 249.0,
+        "custom2": 150.0,
+        "custom3": 252.0,
         "enable": false,
-        "fitMode": 207,
-        "fps": 180.0,
+        "fitMode": 39,
+        "fps": 35.0,
         "gop": 1,
-        "h264Profile": 89,
-        "height": 108,
+        "h264Profile": 61,
+        "height": 61,
         "ip": "afhjaskdm",
         "jpegQuality": 80,
-        "maxBitrateKbps": 61,
-        "minBitrateKbps": 50,
+        "maxBitrateKbps": 89,
+        "minBitrateKbps": 180,
+        "multicastIp": "afhjaskdmasd",
+        "multicastPort": 180,
         "overlayMode": true,
         "password": "adafsodjf",
-        "port": 17,
+        "port": 226,
         "suffix": "asdasdasd",
-        "type": 35,
+        "type": 167,
         "user": "afhidsjfnm",
-        "width": 221
+        "width": 50
     }
 }
 ```

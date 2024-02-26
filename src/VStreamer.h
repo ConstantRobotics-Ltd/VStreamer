@@ -20,6 +20,8 @@ struct VStreamerParamsMask
     bool height{true};
     bool ip{true};
     bool port{true};
+    bool multicastIp{true};
+    bool multicastPort{true};
     bool user{true};
     bool password{true};
     bool suffix{true};
@@ -58,6 +60,10 @@ public:
     std::string ip{"127.0.0.1"};
     /// Streamer port.
     int port{8554};
+    /// Streamer multicast IP.
+    std::string multicastIp{"224.1.0.1"};
+    /// Streamer multicast port.
+    int multicastPort{18000};
     /// Streamer user (for rtsp streaming): "" - no user.
     std::string user{""};
     /// Streamer password (for rtsp streaming): "" - no password.
@@ -97,10 +103,10 @@ public:
     /// Custom parameter 3.
     float custom3{0.0f};
 
-    JSON_READABLE(VStreamerParams, enable, width, height, ip, port, user,
-                  password, suffix, minBitrateKbps, maxBitrateKbps, bitrateKbps,
-                  bitrateMode, fps, gop, h264Profile, jpegQuality, codec,
-                  fitMode, overlayMode, type, custom1, custom2, custom3)
+    JSON_READABLE(VStreamerParams, enable, width, height, ip, port, multicastIp,
+                  multicastPort, user, password, suffix, minBitrateKbps,
+                  maxBitrateKbps, bitrateKbps, bitrateMode, fps, gop, h264Profile,
+                  jpegQuality, codec, fitMode, overlayMode, type, custom1, custom2, custom3)
 
     /**
      * @brief operator =
@@ -146,6 +152,10 @@ enum class VStreamerParam
     IP,
     /// Streamer port.
     PORT,
+    /// Streamer multicast IP.
+    MULTICAST_IP,
+    /// Streamer multicast port.
+    MULTICAST_PORT,
     /// Streamer user (for rtsp streaming): "" - no user.
     USER,
     /// Streamer password (for rtsp streaming): "" - no password.
