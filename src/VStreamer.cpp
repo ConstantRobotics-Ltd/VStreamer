@@ -74,12 +74,12 @@ bool VStreamerParams::encode(uint8_t *data, int bufferSize, int &size, VStreamer
         return false;
     }
 
-    /*  Indices of datas in buffer.
+    /*
         0 = header with value 0x02
         1 and 2 = versions
-        3, 4 and 5 = Masks
-        6 = int size from source system in terms bytes
-        7 = start of actual data.
+        3, 4, 5 and 6 = Masks
+        7 = int size from source system in terms bytes
+        8 = start of actual data.
     */
 
     // Encode version.
@@ -98,7 +98,6 @@ bool VStreamerParams::encode(uint8_t *data, int bufferSize, int &size, VStreamer
 
     if (mask == nullptr)
     {
-
         // start of actual data.
 
         if (bufferSize < pos + sizeof(bool))
@@ -543,9 +542,9 @@ bool VStreamerParams::decode(uint8_t *data, int dataSize)
     /*
         0 = header with value 0x02
         1 and 2 = versions
-        3, 4 and 5 = Masks
-        6 = int size from source system in terms bytes
-        7 = start of actual data.
+        3, 4, 5 and 6 = Masks
+        7 = int size from source system in terms bytes
+        8 = start of actual data.
     */
 
     // Check data size.
@@ -891,7 +890,7 @@ bool VStreamerParams::decode(uint8_t *data, int dataSize)
     }
     else
     {
-        multicastPort = -1;
+        multicastPort = 0;
     }
 
 

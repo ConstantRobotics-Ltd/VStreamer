@@ -63,7 +63,7 @@ public:
     /// Streamer multicast IP.
     std::string multicastIp{"224.1.0.1"};
     /// Streamer multicast port.
-    int multicastPort{18000};
+    unsigned int multicastPort{18000};
     /// Streamer user (for rtsp streaming): "" - no user.
     std::string user{""};
     /// Streamer password (for rtsp streaming): "" - no password.
