@@ -38,6 +38,8 @@ VStreamerParams &VStreamerParams::operator=(const VStreamerParams &src)
     height = src.height;
     ip = src.ip;
     port = src.port;
+    multicastIp = src.multicastIp;
+    multicastPort = src.multicastPort;
     user = src.user;
     password = src.password;
     suffix = src.suffix;
@@ -72,12 +74,12 @@ bool VStreamerParams::encode(uint8_t *data, int bufferSize, int &size, VStreamer
         return false;
     }
 
-    /*  Indices of datas in buffer.
+    /*
         0 = header with value 0x02
         1 and 2 = versions
-        3, 4 and 5 = Masks
-        6 = int size from source system in terms bytes
-        7 = start of actual data.
+        3, 4, 5 and 6 = Masks
+        7 = int size from source system in terms bytes
+        8 = start of actual data.
     */
 
     // Encode version.
@@ -96,7 +98,6 @@ bool VStreamerParams::encode(uint8_t *data, int bufferSize, int &size, VStreamer
 
     if (mask == nullptr)
     {
-
         // start of actual data.
 
         if (bufferSize < pos + sizeof(bool))
@@ -319,6 +320,24 @@ bool VStreamerParams::encode(uint8_t *data, int bufferSize, int &size, VStreamer
         pos += sizeof(int);
         data[6] |= (1 << 7);
 
+        if (bufferSize < pos + multicastIp.size() + 1)
+        {
+            size = pos;
+            return true;
+        }
+        memcpy(&data[pos], multicastIp.c_str(), multicastIp.size() + 1);
+        pos += multicastIp.size() + 1;
+        data[6] |= (1 << 6);
+
+        if (bufferSize < pos + sizeof(int))
+        {
+            size = pos;
+            return true;
+        }
+        memcpy(&data[pos], &multicastPort, sizeof(int));
+        pos += sizeof(int);
+        data[6] |= (1 << 5);
+
         size = pos;
         return true;
     }
@@ -496,6 +515,20 @@ bool VStreamerParams::encode(uint8_t *data, int bufferSize, int &size, VStreamer
         data[6] |= (1 << 7);
     }
 
+    if (mask->multicastIp && (bufferSize > pos + multicastIp.size() + 1))
+    {
+        memcpy(&data[pos], multicastIp.c_str(), multicastIp.size() + 1);
+        pos += multicastIp.size() + 1;
+        data[6] |= (1 << 6);
+    }
+
+    if (mask->multicastPort && (bufferSize > pos + sizeof(int)))
+    {
+        memcpy(&data[pos], &multicastPort, sizeof(int));
+        pos += sizeof(int);
+        data[6] |= (1 << 5);
+    }
+
     size = pos;
 
     return true;
@@ -509,9 +542,9 @@ bool VStreamerParams::decode(uint8_t *data, int dataSize)
     /*
         0 = header with value 0x02
         1 and 2 = versions
-        3, 4 and 5 = Masks
-        6 = int size from source system in terms bytes
-        7 = start of actual data.
+        3, 4, 5 and 6 = Masks
+        7 = int size from source system in terms bytes
+        8 = start of actual data.
     */
 
     // Check data size.
@@ -834,6 +867,32 @@ bool VStreamerParams::decode(uint8_t *data, int dataSize)
     {
         custom3 = -1;
     }
+
+    if (checkBit(data[6], 6))
+    {
+        char *tempVal = new char[50]; // 50 is enough big for any array.
+        strcpy(tempVal, (char *)&data[pos]);
+        pos += strlen(tempVal) + 1;
+        multicastIp = tempVal;
+        delete[] tempVal;
+    }
+    else
+    {
+        multicastIp = "";
+    }
+
+    if (checkBit(data[6], 5))
+    {
+        if (dataSize < pos + sizeInt)
+            return false;
+        memcpy(&multicastPort, &data[pos], sizeInt);
+        pos += sizeInt;
+    }
+    else
+    {
+        multicastPort = 0;
+    }
+
 
     return true;
 }
