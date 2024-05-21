@@ -1,10 +1,10 @@
-![vstreamer_web_logo](_static/vstreamer_web_logo.png)
+![vstreamer_web_logo](./static/vstreamer_web_logo.png)
 
 
 
 # **VStreamer interface C++ library**
 
-**v1.1.1**
+**v1.1.2**
 
 
 
@@ -41,7 +41,7 @@
 
 # Overview
 
-**VStreamer** C++ library provides standard interface as well defines data structures and rules for different video stream classes. **VStreamer** interface class doesn't do anything, just provides interface and methods to encode/decode commands and encode/decode params. Also **VStreamer** class provides data structures for video stream parameters. Different video stream classes inherit interface form **VStreamer** C++ class. **VStreamer.h** file contains list of data structures ([VStreamCommand](#vstreamcommand-enum) enum, [VStreamParam](#vstreamparam-enum) enum and [VStreamParams](#vstreamparams-class-description) class). [VStreamParams](#vstreamparams-class-description) class contains video stream params and includes methods to encode and decode params. [VStreamCommand](#vstreamcommand-enum) enum contains IDs of commands supported by **VStreamer** class. [VStreamParam](#vstreamparam-enum) enum contains IDs of params supported by **VStreamer** class. All video streamers should include params and commands listed in **VStreamer.h** file. **VStreamer** class interface class depends on: [ConfigReader](https://github.com/ConstantRobotics-Ltd/ConfigReader) library provides methods to read/write JSON config files, [VCodec](https://github.com/ConstantRobotics-Ltd/VCodec) interface library for integrating codec implementations in case raw frame streaming, [VOverlay](https://github.com/ConstantRobotics-Ltd/VOverlay) interface library for integrating overlay engines in case raw frame streaming. The library is licensed under the **Apache 2.0** license.
+**VStreamer** C++ library provides standard interface as well defines data structures and rules for different video stream classes. **VStreamer** interface class doesn't do anything, just provides interface and methods to encode/decode commands and encode/decode params. Also **VStreamer** class provides data structures for video stream parameters. Different video stream classes inherit interface form **VStreamer** C++ class. **VStreamer.h** file contains list of data structures ([VStreamCommand](#vstreamcommand-enum) enum, [VStreamParam](#vstreamparam-enum) enum and [VStreamParams](#vstreamparams-class-description) class). [VStreamParams](#vstreamparams-class-description) class contains video stream params and includes methods to encode and decode params. [VStreamCommand](#vstreamcommand-enum) enum contains IDs of commands supported by **VStreamer** class. [VStreamParam](#vstreamparam-enum) enum contains IDs of params supported by **VStreamer** class. All video streamers should include params and commands listed in **VStreamer.h** file. **VStreamer** class interface class depends on: [ConfigReader](https://rapidpixel.constantrobotics.com/docs/service-libraries/config-reader.html) library (provides methods to read/write JSON config files, source code included, Apache 2.0 license), [VCodec](https://rapidpixel.constantrobotics.com/docs/video-codecs/vcodec-interface.html) library (provides interface for video codecs, source code included, Apache 2.0 license), [VOverlay](https://rapidpixel.constantrobotics.com/docs/service-libraries/voverlay-interface.html) library (provides interface for overlay engines in case raw frame streaming, source code included, Apache 2.0 license). The library is licensed under the **Apache 2.0** license.
 
 
 
@@ -54,6 +54,7 @@
 | 1.0.0   | 15.02.2024   | First version of the library. |
 | 1.1.0   | 26.02.2024   | - New parameters added for multicast streaming. |
 | 1.1.1   | 20.03.2024   | - VCodec class updated.<br />- VOverlay class updated.<br />- Frame subrepository excluded.<br />- Documentation updated. |
+| 1.1.2   | 21.05.2024   | - Submodules updated.<br />- Documentation updated. |
 
 
 
@@ -80,7 +81,7 @@ test ----------------------------- Folder with VStreamer test application.
 src ------------------------------ Folder with source code of the library.
     CMakeLists.txt --------------- CMake file of the library.
     VStreamer.cpp ---------------- Source code file of the library.
-    VStreamer.h ------------------ Header file which includes VStreamer class declaration.
+    VStreamer.h ------------------ Main library header file.
     VStreamerVersion.h ----------- Header file which includes version of the library.
     VStreamerVersion.h.in -------- CMake service file to generate version file.
 ```
@@ -173,7 +174,7 @@ std::cout << "VStreamer class version: " << VStreamer::getVersion() << std::endl
 Console output:
 
 ```bash
-VStreamer class version: 1.1.1
+VStreamer class version: 1.1.2
 ```
 
 
@@ -191,8 +192,8 @@ virtual bool initVStreamer(VStreamerParams &params,
 | Parameter | Value                                                        |
 | --------- | ------------------------------------------------------------ |
 | params    | [VStreamerParams](#vstreamparams-class-description) class object. The video streamer should set parameters according to params structure. Particular video streamer might not support all parameters listed in [VStreamerParams](#vstreamparams-class-description) class. |
-| codec      | Pinter [VCodec](https://github.com/ConstantRobotics-Ltd/VCodec) object. Used for encoding video in case RAW input frame data. If user set pointer to **nullptr** the video streamer can process only compressed input video frames. |
-| overlay    | Pointer to [VOverlay](https://github.com/ConstantRobotics-Ltd/VOverlay) object. Used to overlay information on video in case if user put RAW input frame data to the streamer. If user set pointer to **nullptr** the video streamer will not be able overlay any information on video. |
+| codec      | Pinter [VCodec](https://rapidpixel.constantrobotics.com/docs/video-codecs/vcodec-interface.html) object. Used for encoding video in case RAW input frame data. If user set pointer to **nullptr** the video streamer can process only compressed input video frames. |
+| overlay    | Pointer to [VOverlay](https://rapidpixel.constantrobotics.com/docs/service-libraries/voverlay-interface.html) object. Used to overlay information on video in case if user put RAW input frame data to the streamer. If user set pointer to **nullptr** the video streamer will not be able overlay any information on video. |
 
 **Returns:** TRUE if the video streamer initialized or FALSE if not.
 
@@ -230,7 +231,7 @@ virtual bool sendFrame(Frame& frame) = 0;
 
 | Parameter | Value                                                        |
 | --------- | ------------------------------------------------------------ |
-| frame     | [Frame](https://github.com/ConstantRobotics-Ltd/Frame) class object. Particular streamers can support RAW video frames or(and) compressed video frames. |
+| frame     | [Frame](https://rapidpixel.constantrobotics.com/docs/service-libraries/frame.html) class object. Particular streamers can support RAW video frames or(and) compressed video frames. |
 
 **Returns:** TRUE if frame sent (accepted by streamer) or FALSE if not.
 
@@ -346,7 +347,7 @@ static void encodeCommand(uint8_t* data, int& size, VStreamerCommand id);
 | --------- | ------------------------------------------------------------ |
 | data      | Pointer to data buffer for encoded command. Must have size >= 7 bytes. |
 | size      | Size of encoded data. Will be 7 bytes.                       |
-| id        | Command ID according to [**VStreamerCommand enum**](#vsvtreamercommand-enum). |
+| id        | Command ID according to [VStreamerCommand enum](#vsvtreamercommand-enum). |
 
 **encodeCommand(...)** is static and used without **VStreamer** class instance. This method used on client side (control system). Command encoding example:
 
@@ -518,7 +519,7 @@ enum class VStreamerParam
 
 ## VStreamerParams class declaration
 
-**VStreamerParams** class used for video stream initialization ([initVStreamer(...)](#initvstreamer-method) method) or to get all actual params ([getParams(...)](#getparams-method) method). Also **VStreamerParams** provides structure to write/read params from JSON files (**JSON_READABLE** macro, see [ConfigReader](https://github.com/ConstantRobotics-Ltd/ConfigReader) class description) and provide methods to encode and decode params. Class declaration:
+**VStreamerParams** class used for video stream initialization ([initVStreamer(...)](#initvstreamer-method) method) or to get all actual params ([getParams(...)](#getparams-method) method). Also **VStreamerParams** provides structure to write/read params from JSON files (**JSON_READABLE** macro, see [ConfigReader](https://rapidpixel.constantrobotics.com/docs/service-libraries/config-reader.html) class description) and provide methods to encode and decode params. Class declaration:
 
 ```cpp
 class VStreamerParams
@@ -887,7 +888,7 @@ Done!
 
 # How to make custom implementation
 
-The **VStreamer** class provides only an interface, data structures, and methods for encoding and decoding commands and params. To create your own implementation of the video streamer, you must include the VStreamer repository in your project (see [**Build and connect to your project**](#build-and-connect-to-your-project) section). The catalogue **example** (see [**Library files**](#library-files) section) includes an example of the design of the custom video streamer. You must implement all the methods of the VStreamer interface class. Custom video streamer class declaration:
+The **VStreamer** class provides only an interface, data structures, and methods for encoding and decoding commands and params. To create your own implementation of the video streamer, you must include the VStreamer repository in your project (see [**Build and connect to your project**](#build-and-connect-to-your-project) section). The catalogue **example** (see [Library files](#library-files) section) includes an example of the design of the custom video streamer. You must implement all the methods of the VStreamer interface class. Custom video streamer class declaration:
 
 ```cpp
 /// Custom video streamer class.
