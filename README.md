@@ -41,7 +41,7 @@
 
 # Overview
 
-**VStreamer** C++ library provides standard interface as well defines data structures and rules for different video stream classes. **VStreamer** interface class doesn't do anything, just provides interface and methods to encode/decode commands and encode/decode params. Also **VStreamer** class provides data structures for video stream parameters. Different video stream classes inherit interface form **VStreamer** C++ class. **VStreamer.h** file contains list of data structures ([VStreamCommand](#vstreamcommand-enum) enum, [VStreamParam](#vstreamparam-enum) enum and [VStreamParams](#vstreamparams-class-description) class). [VStreamParams](#vstreamparams-class-description) class contains video stream params and includes methods to encode and decode params. [VStreamCommand](#vstreamcommand-enum) enum contains IDs of commands supported by **VStreamer** class. [VStreamParam](#vstreamparam-enum) enum contains IDs of params supported by **VStreamer** class. All video streamers should include params and commands listed in **VStreamer.h** file. **VStreamer** class interface class depends on: [ConfigReader](https://rapidpixel.constantrobotics.com/docs/service-libraries/config-reader.html) library (provides methods to read/write JSON config files, source code included, Apache 2.0 license), [VCodec](https://rapidpixel.constantrobotics.com/docs/video-codecs/vcodec-interface.html) library (provides interface for video codecs, source code included, Apache 2.0 license), [VOverlay](https://rapidpixel.constantrobotics.com/docs/service-libraries/voverlay-interface.html) library (provides interface for overlay engines in case raw frame streaming, source code included, Apache 2.0 license). The library is licensed under the **Apache 2.0** license.
+**VStreamer** C++ library provides standard interface as well defines data structures and rules for different video stream classes. **VStreamer** interface class doesn't do anything, just provides interface and methods to encode/decode commands and encode/decode params. Also **VStreamer** class provides data structures for video stream parameters. Different video stream classes inherit interface form **VStreamer** C++ class. **VStreamer.h** file contains list of data structures ([VStreamCommand](#vstreamercommand-enum) enum, [vstreamerparam](#vstreamerparam-enum) enum and [vstreamerparams](#vstreamerparams-class-description) class). [vstreamerparams](#vstreamerparams-class-description) class contains video stream params and includes methods to encode and decode params. [VStreamCommand](#vstreamercommand-enum) enum contains IDs of commands supported by **VStreamer** class. [vstreamerparam](#vstreamerparam-enum) enum contains IDs of params supported by **VStreamer** class. All video streamers should include params and commands listed in **VStreamer.h** file. **VStreamer** class interface class depends on: [ConfigReader](https://rapidpixel.constantrobotics.com/docs/service-libraries/config-reader.html) library (provides methods to read/write JSON config files, source code included, Apache 2.0 license), [VCodec](https://rapidpixel.constantrobotics.com/docs/video-codecs/vcodec-interface.html) library (provides interface for video codecs, source code included, Apache 2.0 license), [VOverlay](https://rapidpixel.constantrobotics.com/docs/service-libraries/voverlay-interface.html) library (provides interface for overlay engines in case raw frame streaming, source code included, Apache 2.0 license). The library is licensed under the **Apache 2.0** license.
 
 
 
@@ -191,7 +191,7 @@ virtual bool initVStreamer(VStreamerParams &params,
 
 | Parameter | Value                                                        |
 | --------- | ------------------------------------------------------------ |
-| params    | [VStreamerParams](#vstreamparams-class-description) class object. The video streamer should set parameters according to params structure. Particular video streamer might not support all parameters listed in [VStreamerParams](#vstreamparams-class-description) class. |
+| params    | [VStreamerParams](#vstreamerparams-class-description) class object. The video streamer should set parameters according to params structure. Particular video streamer might not support all parameters listed in [VStreamerParams](#vstreamerparams-class-description) class. |
 | codec      | Pinter [VCodec](https://rapidpixel.constantrobotics.com/docs/video-codecs/vcodec-interface.html) object. Used for encoding video in case RAW input frame data. If user set pointer to **nullptr** the video streamer can process only compressed input video frames. |
 | overlay    | Pointer to [VOverlay](https://rapidpixel.constantrobotics.com/docs/service-libraries/voverlay-interface.html) object. Used to overlay information on video in case if user put RAW input frame data to the streamer. If user set pointer to **nullptr** the video streamer will not be able overlay any information on video. |
 
@@ -248,7 +248,7 @@ virtual bool setParam(VStreamerParam id, std::string value) = 0;
 
 | Parameter | Description                                                  |
 | --------- | ------------------------------------------------------------ |
-| id        | Video stream parameter ID according to [VStreamParam](#vstreamparam-enum) enum. |
+| id        | Video stream parameter ID according to [vstreamerparam](#vstreamerparam-enum) enum. |
 | value     | Value of parameter. It can be either string or int type. it depends on parameter. |
 
 **Returns:** TRUE is the parameter was set or FALSE if not.
@@ -265,7 +265,7 @@ virtual void getParams(VStreamerParams& params) = 0;
 
 | Parameter | Description                                                  |
 | --------- | ------------------------------------------------------------ |
-| params    | [VStreamerParams](#vstreamparams-class-description) class object. |
+| params    | [VStreamerParams](#vstreamerparams-class-description) class object. |
 
 
 
@@ -317,8 +317,8 @@ static void encodeSetParamCommand(
 | data      | Pointer to data buffer for encoded command. Must have size >= 11. |
 | size      | Size of encoded data. Will be minimum 11 bytes.              |
 | id        | Parameter ID according to [VStreamerParam](#vstreamerparam-enum) enum. |
-| value1    | Numeral video streamer parameter value. Only for non string parameters. For string parameters (see [VStreamParam](#vstreamparam-enum) enum) this parameters may have any values. |
-| value2    | String parameter value (see [VStreamParam](#vstreamparam-enum) enum). |
+| value1    | Numeral video streamer parameter value. Only for non string parameters. For string parameters (see [vstreamerparam](#vstreamerparam-enum) enum) this parameters may have any values. |
+| value2    | String parameter value (see [vstreamerparam](#vstreamerparam-enum) enum). |
 
 **encodeSetParamCommand(...)** is static and used without **VStreamer** class instance. This method used on client side (control system). Command encoding example:
 
@@ -381,8 +381,8 @@ static int decodeCommand(uint8_t* data,
 | size      | Size of command. Should be 11 bytes for SET_PARAM and 7 bytes for COMMAND. |
 | paramId   | Parameter ID according to [VStreamerParam](#vstreamerparam-enum) enum. After decoding SET_PARAM command the method will return parameter ID. |
 | commandId | Command ID according to [VStreamerCommand](#vstreamercommand-enum) enum. After decoding COMMAND the method will return command ID. |
-| value1    | Numeral video streamer parameter value. Only for non string parameters. For string parameters (see [VStreamParam](#vstreamparam-enum) enum) this parameters may have any values. |
-| value2    | String parameter value (see [VStreamParam](#vstreamparam-enum) enum). |
+| value1    | Numeral video streamer parameter value. Only for non string parameters. For string parameters (see [vstreamerparam](#vstreamerparam-enum) enum) this parameters may have any values. |
+| value2    | String parameter value (see [vstreamerparam](#vstreamerparam-enum) enum). |
 
 **Returns:** **0** - in case decoding COMMAND, **1** - in case decoding SET_PARAM command or **-1** in case errors.
 
