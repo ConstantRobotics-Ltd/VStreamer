@@ -1,5 +1,4 @@
 #pragma once
-#include "Frame.h"
 #include "ConfigReader.h"
 #include "VOverlay.h"
 #include "VCodec.h"
@@ -116,7 +115,7 @@ public:
     VStreamerParams& operator= (const VStreamerParams& src);
 
     /**
-     * @brief Encode params. Method doesn't encode initString.
+     * @brief Encode params.
      * @param data Pointer to data buffer. Must have at least 130 bytes size.
      * @param bufferSize Size of data buffer.
      * @param size Size of data.
@@ -127,7 +126,7 @@ public:
                 VStreamerParamsMask* mask = nullptr);
 
     /**
-     * @brief Decode params. Method doesn't decode initString.
+     * @brief Decode params.
      * @param data Pointer to data.
      * @param dataSize Size of data.
      * @return TRUE is params decoded or FALSE if not.
@@ -347,6 +346,5 @@ public:
                              std::string& strValue);
 
 };
-
 }
 }

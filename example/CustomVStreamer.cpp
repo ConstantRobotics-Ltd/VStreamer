@@ -17,9 +17,7 @@ std::string cr::video::CustomVStreamer::getVersion()
 
 
 
-
-
-bool cr::video::CustomVStreamer::initVStreamer(VStreamerParams& params, VOverlay* overlay, VCodec* codec)
+bool cr::video::CustomVStreamer::initVStreamer(VStreamerParams &params, VCodec *codec, VOverlay *overlay)
 {
     // Copy params.
     m_params = params;

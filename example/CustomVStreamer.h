@@ -31,25 +31,25 @@ public:
      * @return TRUE if the video streamer init or FALSE if not.
      */
     bool initVStreamer(VStreamerParams &params,
-                               VOverlay *overlay = nullptr,
-                               VCodec *codec = nullptr);
+                       VCodec *codec = nullptr,
+                       VOverlay *overlay = nullptr) override;
 
     /**
      * @brief Get open status.
      * @return TRUE if video streamer init or FALSE if not.
      */
-    bool isVStreamerInit();
+    bool isVStreamerInit() override;
 
     /**
      * @brief Close video streamer.
      */
-    void closeVStreamer();
+    void closeVStreamer() override;
 
     /**
      * @brief Send frame to video streamer.
      * @param frame Pointer to frame object.
      */
-    bool sendFrame(Frame& frame);
+    bool sendFrame(Frame& frame) override;
 
     /**
      * @brief Set video streamer param.
@@ -57,7 +57,7 @@ public:
      * @param value Parameter value to set.
      * @return TRUE if property was set of FALSE.
      */
-    bool setParam(VStreamerParam id, float value);
+    bool setParam(VStreamerParam id, float value) override;
 
     /**
      * @brief Set video streamer param.
@@ -65,20 +65,20 @@ public:
      * @param value Parameter value to set.
      * @return TRUE if property was set of FALSE.
      */
-    bool setParam(VStreamerParam id, std::string value);
+    bool setParam(VStreamerParam id, std::string value) override;
 
     /**
      * @brief Get video streamer params structure.
      * @param params Video streamer params class object.
      */
-    void getParams(VStreamerParams& params);
+    void getParams(VStreamerParams& params) override;
 
     /**
      * @brief Execute command.
      * @param id Command ID.
      * @return TRUE if the command accepted or FALSE if not.
      */
-    bool executeCommand(VStreamerCommand id);
+    bool executeCommand(VStreamerCommand id) override;
 
 private:
 
