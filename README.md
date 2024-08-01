@@ -613,13 +613,13 @@ public:
 | ---------------- | ------------------------------------------------------------ |
 | enable           | Enable/disable streamer: **0** - disable, **1** - enabled.   |
 | width            | Frame width. Regardless of the resolution of the input video, if RAW data is processed, the streamer should scale the images according to this parameter. |
-| HEIGHT           | Frame height. Regardless of the resolution of the input video, if RAW data is processed, the streamer should scale the images according to this parameter. |
-| height           | Streamer's ip. It can be, for example, RTSP server IP or destination IP. |
+| height           | Frame height. Regardless of the resolution of the input video, if RAW data is processed, the streamer should scale the images according to this parameter. |
+| ip               | Streamer's ip. It can be, for example, RTSP server IP or destination IP. |
 | port             | Streamer's port. It can be TCP or UDP port depends on implementation. |
 | multicastIp      | Streamer's multicast ip.                                     |
 | multicastPort    | Streamer's multicast port. It can be UDP port in case RTSP server. |
 | user             | User name for auth (for example, in case RTSP server).       |
-| password         | Password name for auth (for example, in case RTSP server).   |
+| password         | Password for auth (for example, in case RTSP server).        |
 | suffix           | Stream name in case RTSP server.                             |
 | minBitrateKbps   | Minimum bitrate for variable bitrate encoding in case RAW input video frames. |
 | maxBitrateKbps   | Maximum bitrate for variable bitrate encoding in case RAW input video frames. |
