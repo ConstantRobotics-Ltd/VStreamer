@@ -41,7 +41,7 @@
 
 # Overview
 
-**VStreamer** C++ library provides standard interface as well defines data structures and rules for different video stream classes. **VStreamer** interface class does nothing, just provides interface and methods to encode/decode commands and encode/decode params. Also **VStreamer** class provides data structures for video stream parameters. Different video stream classes inherit interface form **VStreamer** C++ class. **VStreamer.h** file contains list of data structures ([VStreamCommand](#vstreamercommand-enum) enum, [VStreamerParam](#vstreamerparam-enum) enum and [VStreamerParams](#vstreamerparams-class-description) class). [VStreamerParams](#vstreamerparams-class-description) class contains all streamer params and includes methods to encode and decode params. [VStreamCommand](#vstreamercommand-enum) enum contains IDs of commands supported by **VStreamer** class. [VStreamerParam](#vstreamerparam-enum) enum contains IDs of params supported by **VStreamer** class. All video streamers should include params and commands listed in **VStreamer.h** file. **VStreamer** interface class depends on: [ConfigReader](https://rapidpixel.constantrobotics.com/docs/service-libraries/config-reader.html) library (provides methods to read/write JSON config files, source code included, Apache 2.0 license), [VCodec](https://rapidpixel.constantrobotics.com/docs/video-codecs/vcodec-interface.html) library (provides interface for video codecs, source code included, Apache 2.0 license), [VOverlay](https://rapidpixel.constantrobotics.com/docs/service-libraries/voverlay-interface.html) library (provides interface for overlay engines, source code included, Apache 2.0 license). The library is licensed under the **Apache 2.0** license.
+**VStreamer** C++ library provides standard interface as well defines data structures and rules for different video stream classes. **VStreamer** interface class does nothing, just provides interface and methods to encode/decode commands and encode/decode params. Also **VStreamer** class provides data structures for video stream parameters. Different video stream classes inherit interface form **VStreamer** C++ class. **VStreamer.h** file contains list of data structures ([VStreamCommand](#vstreamercommand-enum) enum, [VStreamerParam](#vstreamerparam-enum) enum and [VStreamerParams](#vstreamerparams-class-description) class). [VStreamerParams](#vstreamerparams-class-description) class contains all streamer params and includes methods to encode and decode params. [VStreamCommand](#vstreamercommand-enum) enum contains IDs of commands supported by **VStreamer** class. [VStreamerParam](#vstreamerparam-enum) enum contains IDs of params supported by **VStreamer** class. All video streamers should include params and commands listed in **VStreamer.h** file. **VStreamer** interface class depends on: [ConfigReader](https://rapidpixel.constantrobotics.com/docs/Service/ConfigReader.html) library (provides methods to read/write JSON config files, source code included, Apache 2.0 license), [VCodec](https://rapidpixel.constantrobotics.com/docs/VideoCoding/VCodec.html) library (provides interface for video codecs, source code included, Apache 2.0 license), [VOverlay](https://rapidpixel.constantrobotics.com/docs/Service/VOverlay.html) library (provides interface for overlay engines, source code included, Apache 2.0 license). The library is licensed under the **Apache 2.0** license.
 
 
 
@@ -202,8 +202,8 @@ virtual bool initVStreamer(VStreamerParams &params,
 | Parameter | Value                                                        |
 | --------- | ------------------------------------------------------------ |
 | params    | [VStreamerParams](#vstreamerparams-class-description) class object. The video streamer should set parameters according to params structure. Particular video streamer might not support all parameters listed in [VStreamerParams](#vstreamerparams-class-description) class. |
-| codec      | Pinter [VCodec](https://rapidpixel.constantrobotics.com/docs/video-codecs/vcodec-interface.html) object. Used for encoding video in case RAW input frame data. If user set pointer to **nullptr** the video streamer can process only compressed input video frames (H264, HEVC or JPEG). |
-| overlay    | Pointer to [VOverlay](https://rapidpixel.constantrobotics.com/docs/service-libraries/voverlay-interface.html) object. Used to overlay information on video in case if user put RAW input frame data to the streamer. If user set pointer to **nullptr** the video streamer will not be able overlay any information on video. |
+| codec      | Pinter [VCodec](https://rapidpixel.constantrobotics.com/docs/VideoCoding/VCodec.html) object. Used for encoding video in case RAW input frame data. If user set pointer to **nullptr** the video streamer can process only compressed input video frames (H264, HEVC or JPEG). |
+| overlay    | Pointer to [VOverlay](https://rapidpixel.constantrobotics.com/docs/Service/VOverlay.html) object. Used to overlay information on video in case if user put RAW input frame data to the streamer. If user set pointer to **nullptr** the video streamer will not be able overlay any information on video. |
 
 **Returns:** TRUE if the video streamer initialized or FALSE if not.
 
@@ -241,7 +241,7 @@ virtual bool sendFrame(Frame& frame) = 0;
 
 | Parameter | Value                                                        |
 | --------- | ------------------------------------------------------------ |
-| frame     | [Frame](https://rapidpixel.constantrobotics.com/docs/service-libraries/frame.html) class object. Particular streamers can support RAW video frames or(and) compressed video frames. |
+| frame     | [Frame](https://rapidpixel.constantrobotics.com/docs/Service/Frame.html) class object. Particular streamers can support RAW video frames or(and) compressed video frames. |
 
 **Returns:** TRUE if frame sent (accepted by streamer) or FALSE if not.
 
@@ -531,7 +531,7 @@ enum class VStreamerParam
 
 ## VStreamerParams class declaration
 
-**VStreamerParams** class used for video stream initialization ([initVStreamer(...)](#initvstreamer-method) method) or to get all actual params ([getParams(...)](#getparams-method) method). Also **VStreamerParams** provides structure to write/read params from JSON files (**JSON_READABLE** macro, see [ConfigReader](https://rapidpixel.constantrobotics.com/docs/service-libraries/config-reader.html) class description) and provide methods to encode and decode params. Class declaration:
+**VStreamerParams** class used for video stream initialization ([initVStreamer(...)](#initvstreamer-method) method) or to get all actual params ([getParams(...)](#getparams-method) method). Also **VStreamerParams** provides structure to write/read params from JSON files (**JSON_READABLE** macro, see [ConfigReader](https://rapidpixel.constantrobotics.com/docs/Service/ConfigReader.html) class description) and provide methods to encode and decode params. Class declaration:
 
 ```cpp
 class VStreamerParams
