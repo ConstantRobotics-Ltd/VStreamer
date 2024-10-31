@@ -6,7 +6,7 @@ cmake_minimum_required(VERSION 3.13)
 ## LIBRARY-PROJECT
 ## name and version
 ###############################################################################
-project(VStreamer VERSION 1.1.3 LANGUAGES CXX)
+project(VStreamer VERSION 1.1.4 LANGUAGES CXX)
 
 
 

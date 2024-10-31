@@ -4,7 +4,7 @@
 
 # **VStreamer interface C++ library**
 
-**v1.1.3**
+**v1.1.4**
 
 
 
@@ -56,6 +56,7 @@
 | 1.1.1   | 20.03.2024   | - VCodec class updated.<br />- VOverlay class updated.<br />- Frame subrepository excluded.<br />- Documentation updated. |
 | 1.1.2   | 21.05.2024   | - Submodules updated.<br />- Documentation updated. |
 | 1.1.3   | 10.07.2024   | - Submodules updated.<br />- CMake updated. |
+| 1.1.4   | 31.10.2024   | - Update VCodec interface.    |
 
 
 
