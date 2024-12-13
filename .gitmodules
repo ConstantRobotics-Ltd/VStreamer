@@ -1,9 +1,9 @@
-[submodule "3rdparty/ConfigReader"]
-	path = 3rdparty/ConfigReader
-	url = https://github.com/ConstantRobotics-Ltd/ConfigReader.git
 [submodule "3rdparty/VOverlay"]
 	path = 3rdparty/VOverlay
 	url = git@github.com:ConstantRobotics-Ltd/VOverlay.git
 [submodule "3rdparty/VCodec"]
 	path = 3rdparty/VCodec
 	url = git@github.com:ConstantRobotics-Ltd/VCodec.git
+[submodule "3rdparty/ConfigReader"]
+	path = 3rdparty/ConfigReader
+	url = git@github.com:ConstantRobotics-Ltd/ConfigReader.git
