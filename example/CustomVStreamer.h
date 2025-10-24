@@ -49,7 +49,7 @@ public:
      * @brief Send frame to video streamer.
      * @param frame Pointer to frame object.
      */
-    bool sendFrame(Frame& frame) override;
+    bool sendFrame(Frame& frame, uint8_t* userData = nullptr, int userDataSize = 0) override;
 
     /**
      * @brief Set video streamer param.

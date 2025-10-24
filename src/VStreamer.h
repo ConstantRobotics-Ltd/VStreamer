@@ -18,12 +18,26 @@ struct VStreamerParamsMask
     bool width{true};
     bool height{true};
     bool ip{true};
-    bool port{true};
-    bool multicastIp{true};
-    bool multicastPort{true};
+    bool rtspPort{true};
+    bool rtpPort{true};
+    bool webRtcPort{true};
+    bool hlsPort{true};
+    bool srtPort{true};
+    bool rtmpPort{true};
+    bool metadataPort{true};
+    bool rtspEnable{true};
+    bool rtpEnable{true};
+    bool webRtcEnable{true};
+    bool hlsEnable{true};
+    bool srtEnable{true};
+    bool rtmpEnable{true};
+    bool metadataEnable{true};
+    bool rtspMulticastIp{true};
+    bool rtspMulticastPort{true};
     bool user{true};
     bool password{true};
     bool suffix{true};
+    bool metadataSuffix{true};
     bool minBitrateKbps{true};
     bool maxBitrateKbps{true};
     bool bitrateKbps{true};
@@ -35,13 +49,12 @@ struct VStreamerParamsMask
     bool codec{true};
     bool fitMode{true};
     bool cycleTimeMksec{true};
-    bool overlayMode{true};
+    bool overlayEnable{true};
     bool type{true};
     bool custom1{true};
     bool custom2{true};
     bool custom3{true};
 };
-
 
 /**
  * @brief VStreamer params class.
@@ -49,7 +62,7 @@ struct VStreamerParamsMask
 class VStreamerParams
 {
 public:
-    /// Streamer mode: false - Off, true - On.
+    /// Streamer enable / disable (for all protocols): false - Off, true - On.
     bool enable{true};
     /// Video stream width from 8 to 8192.
     int width{1280};
@@ -57,18 +70,46 @@ public:
     int height{720};
     /// Streamer IP.
     std::string ip{"127.0.0.1"};
-    /// Streamer port.
-    int port{8554};
-    /// Streamer multicast IP.
-    std::string multicastIp{"224.1.0.1"};
-    /// Streamer multicast port.
-    unsigned int multicastPort{18000};
+    /// RTSP port.
+    int rtspPort{8554};
+    /// RTP port.
+    int rtpPort{5004};
+    /// WebRTC port.
+    int webRtcPort{7000};
+    /// HLS port.
+    int hlsPort{8080};
+    /// SRT port.
+    int srtPort{6000};
+    /// RTMP port.
+    int rtmpPort{1935};
+    /// Metadata port.
+    int metadataPort{9000};
+    /// RTSP protocol enable / disable.
+    bool rtspEnable{true};
+    /// RTP protocol enable / disable.
+    bool rtpEnable{true};
+    /// WebRTC protocol enable / disable.
+    bool webRtcEnable{true};
+    /// HLS protocol enable / disable.
+    bool hlsEnable{true};
+    /// SRT protocol enable / disable.
+    bool srtEnable{true};
+    /// RTMP protocol enable / disable.
+    bool rtmpEnable{true};
+    /// Metadata protocol enable / disable.
+    bool metadataEnable{false};
+    /// RTSP multicast IP.
+    std::string rtspMulticastIp{"224.1.0.1"};
+    /// RTSP multicast port.
+    int rtspMulticastPort{18000};
     /// Streamer user (for rtsp streaming): "" - no user.
     std::string user{""};
     /// Streamer password (for rtsp streaming): "" - no password.
     std::string password{""};
-    /// Streamer suffix (for rtsp streaming) (stream name).
+    /// Stream suffix (for rtsp streaming) (stream name).
     std::string suffix{"live"};
+    /// Metadata suffix (stream name).
+    std::string metadataSuffix{"metadata"};
     /// Minimum bitrate for variable bitrate mode, kbps.
     int minBitrateKbps{1000};
     /// Maximum bitrate for variable bitrate mode, kbps.
@@ -87,13 +128,13 @@ public:
     int jpegQuality{80};
     /// Codec type: "H264", "HEVC" or "JPEG".
     std::string codec{"H264"};
-    /// Scaling mode: 0 - fit, 1 - cut.
+    /// Scaling mode: 0 - fit, 1 - fill.
     int fitMode{0};
     /// Cycle time, mksec. Calculated by RTSP server.
     int cycleTimeMksec{0};
-    /// Overlay mode: false - off, true - on.
-    bool overlayMode{true};
-    /// type of the streamer
+    /// Overlay enable / disable: false - off, true - on.
+    bool overlayEnable{true};
+    /// Type of the streamer. Depends on implementation.
     int type{0};
     /// Custom parameter 1.
     float custom1{0.0f};
@@ -102,21 +143,18 @@ public:
     /// Custom parameter 3.
     float custom3{0.0f};
 
-    JSON_READABLE(VStreamerParams, enable, width, height, ip, port, multicastIp,
-                  multicastPort, user, password, suffix, minBitrateKbps,
-                  maxBitrateKbps, bitrateKbps, bitrateMode, fps, gop, h264Profile,
-                  jpegQuality, codec, fitMode, overlayMode, type, custom1, custom2, custom3)
-
-    /**
-     * @brief operator =
-     * @param src Source object.
-     * @return VStreamerParams object.
-     */
-    VStreamerParams& operator= (const VStreamerParams& src);
+    JSON_READABLE(VStreamerParams, enable, width, height, ip, rtspPort, rtpPort,
+                  webRtcPort, hlsPort, srtPort, rtmpPort, metadataPort,
+                  rtspEnable, rtpEnable, webRtcEnable, hlsEnable, srtEnable,
+                  rtmpEnable, metadataEnable, rtspMulticastIp,
+                  rtspMulticastPort, user, password, suffix, metadataSuffix,
+                  minBitrateKbps, maxBitrateKbps, bitrateKbps, bitrateMode, fps,
+                  gop, h264Profile, jpegQuality, codec, fitMode, overlayEnable,
+                  type, custom1, custom2, custom3)
 
     /**
      * @brief Encode params.
-     * @param data Pointer to data buffer. Must have at least 130 bytes size.
+     * @param data Pointer to data buffer. Must have at least 128 bytes size.
      * @param bufferSize Size of data buffer.
      * @param size Size of data.
      * @param mask Pointer to parameters mask.
@@ -149,18 +187,46 @@ enum class VStreamerParam
     HEIGHT,
     /// Streamer IP.
     IP,
-    /// Streamer port.
-    PORT,
-    /// Streamer multicast IP.
-    MULTICAST_IP,
-    /// Streamer multicast port.
-    MULTICAST_PORT,
+    /// RTSP port.
+    RTSP_PORT,
+    /// RTP port.
+    RTP_PORT,
+    /// WebRTC port.
+    WEBRTC_PORT,
+    /// HLS port.
+    HLS_PORT,
+    /// SRT port.
+    SRT_PORT,
+    /// RTMP port.
+    RTMP_PORT,
+    /// Metadata port.
+    METADATA_PORT,
+    /// RTSP protocol enable / disable.
+    RTSP_MODE,
+    /// RTP protocol enable / disable.
+    RTP_MODE,
+    /// WebRTC protocol enable / disable.
+    WEBRTC_MODE,
+    /// HLS protocol enable / disable.
+    HLS_MODE,
+    /// SRT protocol enable / disable.
+    SRT_MODE,
+    /// RTMP protocol enable / disable.
+    RTMP_MODE,
+    /// Metadata protocol enable / disable.
+    METADATA_MODE,
+    /// RTSP multicast IP.
+    RTSP_MULTICAST_IP,
+    /// RTSP multicast port.
+    RTSP_MULTICAST_PORT,
     /// Streamer user (for rtsp streaming): "" - no user.
     USER,
     /// Streamer password (for rtsp streaming): "" - no password.
     PASSWORD,
     /// Streamer suffix(for rtsp streaming, stream name).
     SUFFIX,
+    /// Metadata suffix (stream name).
+    METADATA_SUFFIX,
     /// Minimum bitrate for variable bitrate mode, kbps.
     MIN_BITRATE_KBPS,
     /// Maximum bitrate for variable bitrate mode, kbps.
@@ -179,13 +245,13 @@ enum class VStreamerParam
     JPEG_QUALITY,
     /// Codec type: "H264", "HEVC" or "JPEG".
     CODEC,
-    /// Scaling mode: 0 - fit, 1 - cut.
+    /// Scaling mode: 0 - fit, 1 - fill.
     FIT_MODE,
     /// Cycle time, mksec. Calculated by RTSP server.
     CYCLE_TIME_MKSEC,
     /// Overlay mode: false - off, true - on.
     OVERLAY_MODE,
-    /// Type of the streamer
+    /// Type of the streamer. Depends on implementation.
     TYPE,
     /// Custom parameter 1.
     CUSTOM1,
@@ -207,7 +273,9 @@ enum class VStreamerCommand
     /// Enable. Equal to MODE param.
     ON,
     /// Disable. Equal to MODE param.
-    OFF
+    OFF,
+    /// Generate key frame command.
+    GENERATE_KEYFRAME
 };
 
 
@@ -255,7 +323,7 @@ public:
      * @brief Send frame to video streamer.
      * @param frame Pointer to frame object.
      */
-    virtual bool sendFrame(Frame& frame) = 0;
+    virtual bool sendFrame(Frame& frame, uint8_t* userData = nullptr, int userDataSize = 0) = 0;
 
     /**
      * @brief Set video streamer param.

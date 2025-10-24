@@ -40,7 +40,7 @@ void cr::video::CustomVStreamer::closeVStreamer()
 
 
 
-bool cr::video::CustomVStreamer::sendFrame(Frame& frame)
+bool cr::video::CustomVStreamer::sendFrame(Frame& frame, uint8_t* userData , int userDataSize)
 {
     // Send frame here.
     return true;
