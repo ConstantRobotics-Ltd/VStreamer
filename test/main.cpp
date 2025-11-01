@@ -22,11 +22,11 @@ bool compareParams(VStreamerParams &a, VStreamerParams &b, VStreamerParamsMask* 
 // Copy test.
 bool copyTest();
 
-// Encode/decode test.
-bool encodeDecodeTest();
+// Serialize/deserialize test.
+bool serializeDeserializeTest();
 
-/// Encode/decode test with params mask.
-bool encodeDecodeWithMaskTest();
+/// Serialize/deserialize test with params mask.
+bool serializeDeserializeWithMaskTest();
 
 /// Encode/decode commands test.
 bool encodeDecodeCommandsTest();
@@ -52,15 +52,15 @@ int main(void)
         cout << "ERROR" << endl;
     cout << endl;
 
-    cout << "Encode/Decode test:" << endl;
-    if (encodeDecodeTest())
+    cout << "Serialize/Deserialize test:" << endl;
+    if (serializeDeserializeTest())
         cout << "OK" << endl;
     else
         cout << "ERROR" << endl;
     cout << endl;
 
-    cout << "Encode/Decode test with params mask:" << endl;
-    if (encodeDecodeWithMaskTest())
+    cout << "Serialize/Deserialize test with params mask:" << endl;
+    if (serializeDeserializeWithMaskTest())
         cout << "OK" << endl;
     else
         cout << "ERROR" << endl;
@@ -262,9 +262,9 @@ bool compareParams(VStreamerParams &a, VStreamerParams &b, VStreamerParamsMask* 
         cout << "fitMode" << endl;
         return false;
     }
-    if (mask->cycleTimeMksec && (a.cycleTimeMksec != b.cycleTimeMksec))
+    if (mask->cycleTimeUs && (a.cycleTimeUs != b.cycleTimeUs))
     {
-        cout << "cycleTimeMksec" << endl;
+        cout << "cycleTimeUs" << endl;
     }
     if (mask->overlayEnable && (a.overlayEnable != b.overlayEnable))    
     {
@@ -312,24 +312,24 @@ bool copyTest()
 
 
 
-bool encodeDecodeTest()
+bool serializeDeserializeTest()
 {
     // Prepare random params.
     VStreamerParams in;
     fillRandomData(in);
 
-    // Encode data.
+    // Serialize data.
     uint8_t data[1024];
     int size = 0;
-    in.encode(data, 1024, size);
+    in.serialize(data, 1024, size);
 
-    cout << "Encoded data size: " << size << " bytes" << endl;
+    cout << "Serialized data size: " << size << " bytes" << endl;
 
-    // Decode data.
+    // Deserialize data.
     VStreamerParams out;
-    if (!out.decode(data, size))
+    if (!out.deserialize(data, size))
     {
-        cout << "Can't decode data" << endl;
+        cout << "Can't deserialize data" << endl;
         return false;
     }
 
@@ -427,7 +427,7 @@ bool jsonReadWriteTest()
 
 
 
-bool encodeDecodeWithMaskTest()
+bool serializeDeserializeWithMaskTest()
 {
     // Prepare random params.
     VStreamerParams in;
@@ -469,7 +469,7 @@ bool encodeDecodeWithMaskTest()
     mask.jpegQuality = false;
     mask.codec = false;
     mask.fitMode = false;
-    mask.cycleTimeMksec = false;
+    mask.cycleTimeUs = false;
     mask.overlayEnable = true;
     mask.type = true;
     mask.custom1 = true;
@@ -479,15 +479,15 @@ bool encodeDecodeWithMaskTest()
     // Encode data.
     uint8_t data[1024];
     int size = 0;
-    in.encode(data, 1024, size, &mask);
+    in.serialize(data, 1024, size, &mask);
 
-    cout << "Encoded data size: " << size << " bytes" << endl;
+    cout << "Serialized data size: " << size << " bytes" << endl;
 
     // Decode data.
     VStreamerParams out;
-    if (!out.decode(data, size))
+    if (!out.deserialize(data, size))
     {
-        cout << "Can't decode data" << endl;
+        cout << "Can't deserialize data" << endl;
         return false;
     }
 

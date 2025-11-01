@@ -1,5 +1,7 @@
 #include "VStreamer.h"
 #include "VStreamerVersion.h"
+#include <string>
+#include <cstring>
 
 
 // Macro to check bit in byte.
@@ -26,7 +28,7 @@ string VStreamer::getVersion()
 
 
 
-bool VStreamerParams::encode(uint8_t *data, int bufferSize, int &size, VStreamerParamsMask *mask)
+bool VStreamerParams::serialize(uint8_t *data, int bufferSize, int &size, VStreamerParamsMask *mask)
 {
     // Check buffer size.
     if (bufferSize < 9) // Header + one bool parameter.
@@ -39,13 +41,13 @@ bool VStreamerParams::encode(uint8_t *data, int bufferSize, int &size, VStreamer
     data[0] = 0x02; // Header.
     data[1] = VSTREAMER_MAJOR_VERSION; // Major version.
     data[2] = VSTREAMER_MINOR_VERSION; // Minor version.
-    data[3] = 0; // Parameters mask byte 1
-    data[4] = 0; // Parameters mask byte 2
-    data[5] = 0; // Parameters mask byte 3
-    data[6] = 0; // Parameters mask byte 4
-    data[7] = 0; // Parameters mask byte 5
+    data[3] = 0; // Parameter mask byte 1
+    data[4] = 0; // Parameter mask byte 2
+    data[5] = 0; // Parameter mask byte 3
+    data[6] = 0; // Parameter mask byte 4
+    data[7] = 0; // Parameter mask byte 5
 
-    // If mask not initialized then encode all params.
+    // If mask is not initialized then encode all parameters.
     VStreamerParamsMask defaultMask;
     if (mask == nullptr)
         mask = &defaultMask;
@@ -207,7 +209,7 @@ bool VStreamerParams::encode(uint8_t *data, int bufferSize, int &size, VStreamer
         data[5] |= (1 << 2);
     }
 
-    if (mask->suffix && (bufferSize > pos + user.size() + 1))
+    if (mask->suffix && (bufferSize > pos + suffix.size() + 1))
     {
         memcpy(&data[pos], suffix.c_str(), suffix.size() + 1);
         pos += suffix.size() + 1;
@@ -277,7 +279,7 @@ bool VStreamerParams::encode(uint8_t *data, int bufferSize, int &size, VStreamer
         data[6] |= (1 << 0);
     }
 
-    if (mask->codec && (bufferSize > pos + user.size() + 1))
+    if (mask->codec && (bufferSize > pos + codec.size() + 1))
     {
         memcpy(&data[pos], codec.c_str(), codec.size() + 1);
         pos += codec.size() + 1;
@@ -291,9 +293,9 @@ bool VStreamerParams::encode(uint8_t *data, int bufferSize, int &size, VStreamer
         data[7] |= (1 << 6);
     }
 
-    if (mask->cycleTimeMksec && (bufferSize > pos + sizeof(int)))
+    if (mask->cycleTimeUs && (bufferSize > pos + sizeof(int)))
     {
-        memcpy(&data[pos], &cycleTimeMksec, sizeof(int));
+        memcpy(&data[pos], &cycleTimeUs, sizeof(int));
         pos += sizeof(int);
         data[7] |= (1 << 5);
     }
@@ -340,7 +342,7 @@ bool VStreamerParams::encode(uint8_t *data, int bufferSize, int &size, VStreamer
 
 
 
-bool VStreamerParams::decode(uint8_t *data, int dataSize)
+bool VStreamerParams::deserialize(uint8_t *data, int dataSize)
 {
     // Check data size.
     if (dataSize < 9)
@@ -772,12 +774,12 @@ bool VStreamerParams::decode(uint8_t *data, int dataSize)
     {
         if (dataSize < pos + sizeof(int))
             return false;
-        memcpy(&cycleTimeMksec, &data[pos], sizeof(int));
+        memcpy(&cycleTimeUs, &data[pos], sizeof(int));
         pos += sizeof(int);
     }
     else
     {
-        cycleTimeMksec = 0;
+        cycleTimeUs = 0;
     }
 
     if (checkBit(data[7], 4))
@@ -862,7 +864,7 @@ void VStreamer::encodeSetParamCommand(
 
 
 
-void encodeSetParamCommand(
+void cr::video::VStreamer::encodeSetParamCommand(
     uint8_t* data, int& size, VStreamerParam id, std::string value)
 {
     // Fill header.
@@ -927,7 +929,7 @@ int cr::video::VStreamer::decodeCommand(uint8_t *data,
     {
         // Check size.
         if (size != 11)
-            return false;
+            return -1;
 
         paramId = (VStreamerParam)id;
         memcpy(&value, &data[7], 4);
@@ -935,13 +937,19 @@ int cr::video::VStreamer::decodeCommand(uint8_t *data,
     }
     else if(data[0] == 0x02)
     {
-        // We can't check size here because we don't know the size of string.
+        // Check minimum size for string command.
+        if (size < 8)
+            return -1;
 
         paramId = (VStreamerParam)id;
 
-        char *tempVal = new char[50]; // 50 is enough big for any array.
-        strcpy(tempVal, (char *)&data[7]);
-        strValue = std::string(tempVal);
+        // Safe string copying with bounds checking
+        int maxLen = size - 7;  // Remaining buffer size after header and parameter ID
+        char tempBuffer[512];   // Temporary buffer for safety
+        int copyLen = (maxLen < 511) ? maxLen : 511;
+        memcpy(tempBuffer, &data[7], copyLen);
+        tempBuffer[copyLen] = '\0';  // Ensure null termination
+        strValue = std::string(tempBuffer);
         return 2;
     }
 
@@ -953,19 +961,19 @@ int cr::video::VStreamer::decodeCommand(uint8_t *data,
 bool cr::video::VStreamer::decodeAndExecuteCommand(uint8_t* data, int size)
 {
     // Decode command.
-    VStreamerCommand commandId = VStreamerCommand::RESTART; // any value.
-    VStreamerParam paramId = VStreamerParam::FIT_MODE; // any value.
+    VStreamerCommand commandId = VStreamerCommand::RESTART; // Default value.
+    VStreamerParam paramId = VStreamerParam::FIT_MODE; // Default value.
     float value = 0.0f;
     std::string strValue = "";
     switch (VStreamer::decodeCommand(data, size, paramId, commandId, value, strValue))
     {
-    // COMMAND.
+    // Command.
     case 0:
         return executeCommand(commandId);
-    // SET_PARAM.
+    // Set parameter.
     case 1:
         return setParam(paramId, value);
-    // SET_PARAM_STR.
+    // Set parameter string.
     case 2:
         return setParam(paramId, strValue);
     default:

@@ -19,7 +19,7 @@ std::string cr::video::CustomVStreamer::getVersion()
 
 bool cr::video::CustomVStreamer::initVStreamer(VStreamerParams &params, VCodec *codec, VOverlay *overlay)
 {
-    // Copy params.
+    // Copy parameters.
     m_params = params;
     return true;
 }
@@ -35,7 +35,7 @@ bool cr::video::CustomVStreamer::isVStreamerInit()
 
 void cr::video::CustomVStreamer::closeVStreamer()
 {
-    // close here the video streamer.
+    // Close here the video streamer.
 }
 
 
@@ -49,6 +49,13 @@ bool cr::video::CustomVStreamer::sendFrame(Frame& frame, uint8_t* userData , int
 
 
 bool cr::video::CustomVStreamer::setParam(VStreamerParam id, float value)
+{
+    return true;
+}
+
+
+
+bool cr::video::CustomVStreamer::setParam(VStreamerParam id, std::string value)
 {
     return true;
 }
@@ -76,6 +83,4 @@ bool cr::video::CustomVStreamer::executeCommand(VStreamerCommand id)
         return false;
     }
     }
-
-    return false;
 }

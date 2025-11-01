@@ -24,19 +24,19 @@ public:
     static std::string getVersion();
 
     /**
-     * @brief Init video streamer. All params will be set according to structure.
+     * @brief Initialize video streamer. All parameters will be set according to structure.
      * @param params Video streamer parameters structure.
-     * @param overlay Pointer to overlay object (in case raw frame streaming).
-     * @param codec Pointer to codec object (in case raw frame streaming).
-     * @return TRUE if the video streamer init or FALSE if not.
+     * @param codec Pointer to codec object (in case of raw frame streaming).
+     * @param overlay Pointer to overlay object (in case of raw frame streaming).
+     * @return TRUE if the video streamer is initialized or FALSE if not.
      */
     bool initVStreamer(VStreamerParams &params,
                        VCodec *codec = nullptr,
                        VOverlay *overlay = nullptr) override;
 
     /**
-     * @brief Get open status.
-     * @return TRUE if video streamer init or FALSE if not.
+     * @brief Get initialization status.
+     * @return TRUE if video streamer is initialized or FALSE if not.
      */
     bool isVStreamerInit() override;
 
@@ -47,42 +47,45 @@ public:
 
     /**
      * @brief Send frame to video streamer.
-     * @param frame Pointer to frame object.
+     * @param frame Reference to frame object.
+     * @param userData Pointer to optional user data.
+     * @param userDataSize Size of user data.
+     * @return TRUE if frame was sent successfully or FALSE if not.
      */
     bool sendFrame(Frame& frame, uint8_t* userData = nullptr, int userDataSize = 0) override;
 
     /**
-     * @brief Set video streamer param.
+     * @brief Set video streamer parameter.
      * @param id Parameter ID.
      * @param value Parameter value to set.
-     * @return TRUE if property was set of FALSE.
+     * @return TRUE if parameter was set or FALSE if not.
      */
     bool setParam(VStreamerParam id, float value) override;
 
     /**
-     * @brief Set video streamer param.
+     * @brief Set video streamer parameter.
      * @param id Parameter ID.
      * @param value Parameter value to set.
-     * @return TRUE if property was set of FALSE.
+     * @return TRUE if parameter was set or FALSE if not.
      */
     bool setParam(VStreamerParam id, std::string value) override;
 
     /**
-     * @brief Get video streamer params structure.
-     * @param params Video streamer params class object.
+     * @brief Get video streamer parameters structure.
+     * @param params Video streamer parameters class object.
      */
     void getParams(VStreamerParams& params) override;
 
     /**
      * @brief Execute command.
      * @param id Command ID.
-     * @return TRUE if the command accepted or FALSE if not.
+     * @return TRUE if the command is accepted or FALSE if not.
      */
     bool executeCommand(VStreamerCommand id) override;
 
 private:
 
-    /// Video source params.
+    /// Video source parameters.
     VStreamerParams m_params;
 
 };
