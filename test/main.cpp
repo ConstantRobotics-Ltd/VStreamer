@@ -3,19 +3,81 @@
 
 
 
+// Link namespaces.
 using namespace cr::video;
 using namespace std;
 
 
 
+// Fill random data.
+void fillRandomData(VStreamerParams &a)
+{
+    a.enable = false;
+    a.width = rand() % 65535 + 1;
+    a.height = rand() % 65535 + 1;
+    a.ip = "sfspfo9jbjnbjhklvllks";
+    a.rtspPort = rand() % 65535 + 1;
+    a.rtpPort = rand() % 65535 + 1;
+    a.webRtcPort = rand() % 65535 + 1;
+    a.hlsPort = rand() % 65535 + 1;
+    a.srtPort = rand() % 65535 + 1;
+    a.rtmpPort = rand() % 65535 + 1;
+    a.metadataPort = rand() % 65535 + 1;
+    a.rtspEnable = true;
+    a.rtpEnable = true;
+    a.webRtcEnable = false;
+    a.hlsEnable = false;
+    a.srtEnable = true;
+    a.rtmpEnable = true;
+    a.metadataEnable = false;
+    a.rtspMulticastIp = "wpofuihifo";
+    a.rtspMulticastPort = rand() % 65535 + 1;
+    a.user = "slfljkv";
+    a.password = "sddgoihw,";
+    a.suffix = "pisfhcowmfv";
+    a.metadataSuffix = "z.,nfpowe";
+    a.minBitrateKbps = rand() % 65535 + 1;
+    a.maxBitrateKbps = rand() % 65535 + 1;
+    a.bitrateKbps = rand() % 65535 + 1;
+    a.bitrateMode = rand() % 65535 + 1;
+    a.fps = rand() % 65535 + 1;
+    a.gop = rand() % 65535 + 1;
+    a.h264Profile = rand() % 65535 + 1;
+    a.jpegQuality = rand() % 65535 + 1;
+    a.codec = "dkgvmkrnjv";
+    a.fitMode = rand() % 65535 + 1;
+    a.cycleTimeUs = rand() % 65535 + 1;
+    a.overlayEnable = true;
+    a.type = rand() % 65535 + 1;
+    a.custom1 = rand() % 65535 + 1;
+    a.custom2 = rand() % 65535 + 1;
+    a.custom3 = rand() % 65535 + 1;
+    a.rtspKey = "dh;skcsf";
+    a.rtspCert = "lkjrkjg";
+    a.webRtcKey = "WERUHUHFE";
+    a.webRtcCert = "erghshiAJ";
+    a.hlsKey = "wqlovf;qb";
+    a.hlsCert = "24kjcnnv";
+    a.rtmpKey = "dkkkkjfkjdkjfkj2134";
+    a.rtmpCert = "wfpomv";
+    a.rtspEncryption = "quyen";
+    a.webRtcEncryption = "l;uoykh";
+    a.rtmpEncryption = "skldfjdf";
+    a.hlsEncryption = "wieufjpowkf";
+}
+
+
+// Compare params function.
+bool compareParams(VStreamerParams &a, VStreamerParams &b, VStreamerParamsMask* mask = nullptr);
+
 // Copy test.
 bool copyTest();
 
-// Encode/decode test.
-bool encodeDecodeTest();
+// Serialize/deserialize test.
+bool serializeDeserializeTest();
 
-/// Encode/decode test with params mask.
-bool encodeDecodeWithMaskTest();
+/// Serialize/deserialize test with params mask.
+bool serializeDeserializeWithMaskTest();
 
 /// Encode/decode commands test.
 bool encodeDecodeCommandsTest();
@@ -41,15 +103,15 @@ int main(void)
         cout << "ERROR" << endl;
     cout << endl;
 
-    cout << "Encode/Decode test:" << endl;
-    if (encodeDecodeTest())
+    cout << "Serialize/Deserialize test:" << endl;
+    if (serializeDeserializeTest())
         cout << "OK" << endl;
     else
         cout << "ERROR" << endl;
     cout << endl;
 
-    cout << "Encode/Decode test with params mask:" << endl;
-    if (encodeDecodeWithMaskTest())
+    cout << "Serialize/Deserialize test with params mask:" << endl;
+    if (serializeDeserializeWithMaskTest())
         cout << "OK" << endl;
     else
         cout << "ERROR" << endl;
@@ -74,354 +136,316 @@ int main(void)
 
 
 
-bool copyTest()
+bool compareParams(VStreamerParams &a, VStreamerParams &b, VStreamerParamsMask* mask)
 {
-    // Prepare random params.
-    VStreamerParams in;
-    in.enable = rand() % 2;
-    in.width = rand() % 255;
-    in.height = rand() % 255;
-    in.ip = "afhjaskdm";
-    in.port = rand() % 255;
-    in.multicastIp = "afhjaskdm";
-    in.multicastPort = rand() % 255;
-    in.user = "afhidsjfnm";
-    in.password = "adafsodjf";
-    in.suffix = "asdasdasd";
-    in.minBitrateKbps = rand() % 255;
-    in.maxBitrateKbps = rand() % 255;
-    in.bitrateKbps = rand() % 255;
-    in.bitrateMode = rand() % 255;
-    in.fps = rand() % 255;
-    in.gop = true;
-    in.h264Profile = rand() % 255;
-    in.codec = "eydiucnksa";
-    in.fitMode = rand() % 255;
-    in.cycleTimeMksec = rand() % 255;
-    in.overlayMode = rand() % 255;
-    in.type = rand() % 255;
-    in.custom1 = rand() % 255;
-    in.custom2 = rand() % 255;
-    in.custom3 = rand() % 255;
+    // If mask not initialized then compare all params.
+    VStreamerParamsMask defaultMask;
+    if (mask == nullptr)
+        mask = &defaultMask;
 
-    // Copy params.
-    VStreamerParams out = in;
-
-    // Compare params.
-    if (in.enable != out.enable)
+    if (mask->enable && (a.enable != b.enable))
     {
-        cout << "in.enable" << endl;
+        cout << "enable" << endl;
         return false;
     }
-    if (in.width != out.width)
+    if (mask->width && (a.width != b.width))
     {
-        cout << "in.width" << endl;
+        cout << "width" << endl;
         return false;
     }
-    if (in.height != out.height)
+    if (mask->height && (a.height != b.height))
     {
-        cout << "in.height" << endl;
+        cout << "height" << endl;
         return false;
     }
-    if (in.ip != out.ip)
+    if (mask->ip && (a.ip != b.ip))
     {
-        cout << "in.ip" << endl;
+        cout << "ip" << endl;
         return false;
     }
-    if (in.port != out.port)
+    if (mask->rtspPort && (a.rtspPort != b.rtspPort))
     {
-        cout << "in.port" << endl;
+        cout << "rtspPort" << endl;
         return false;
     }
-    if (in.multicastIp != out.multicastIp)
+    if (mask->rtpPort && (a.rtpPort != b.rtpPort))
     {
-        cout << "in.multicastIp" << endl;
+        cout << "rtpPort" << endl;
         return false;
     }
-    if (in.multicastPort != out.multicastPort)
+    if (mask->webRtcPort && (a.webRtcPort != b.webRtcPort))
     {
-        cout << "in.multicastPort" << endl;
+        cout << "webRtcPort" << endl;
         return false;
     }
-    if (in.user != out.user)
+    if (mask->hlsPort && (a.hlsPort != b.hlsPort))
     {
-        cout << "in.user" << endl;
+        cout << "hlsPort" << endl;
         return false;
     }
-    if (in.password != out.password)
+    if (mask->srtPort && (a.srtPort != b.srtPort))
     {
-        cout << "in.password" << endl;
+        cout << "srtPort" << endl;
         return false;
     }
-    if (in.suffix != out.suffix)
+    if (mask->rtmpPort && (a.rtmpPort != b.rtmpPort))
     {
-        cout << "in.suffix" << endl;
+        cout << "rtmpPort" << endl;
         return false;
     }
-    if (in.minBitrateKbps != out.minBitrateKbps)
+    if (mask->metadataPort && (a.metadataPort != b.metadataPort))
     {
-        cout << "in.minBitrateKbps" << endl;
+        cout << "metadataPort" << endl;
         return false;
     }
-    if (in.maxBitrateKbps != out.maxBitrateKbps)
+    if (mask->rtspEnable && (a.rtspEnable != b.rtspEnable))
     {
-        cout << "in.maxBitrateKbps" << endl;
+        cout << "rtspEnable" << endl;
         return false;
     }
-    if (in.bitrateKbps != out.bitrateKbps)
+    if (mask->rtpEnable && (a.rtpEnable != b.rtpEnable))
     {
-        cout << "in.bitrateKbps" << endl;
+        cout << "rtpEnable" << endl;
         return false;
     }
-    if (in.bitrateMode != out.bitrateMode)
+    if (mask->webRtcEnable && (a.webRtcEnable != b.webRtcEnable))
     {
-        cout << "in.bitrateMode" << endl;
+        cout << "webRtcEnable" << endl;
         return false;
     }
-    if (in.fps != out.fps)
+    if (mask->hlsEnable && (a.hlsEnable != b.hlsEnable))
     {
-        cout << "in.fps" << endl;
+        cout << "hlsEnable" << endl;
         return false;
     }
-    if (in.gop != out.gop)
+    if (mask->srtEnable && (a.srtEnable != b.srtEnable))
     {
-        cout << "in.gop" << endl;
+        cout << "srtEnable" << endl;
         return false;
     }
-    if (in.h264Profile != out.h264Profile)
+    if (mask->rtmpEnable && (a.rtmpEnable != b.rtmpEnable))
     {
-        cout << "in.h264Profile" << endl;
+        cout << "rtmpEnable" << endl;
         return false;
     }
-    if (in.jpegQuality != out.jpegQuality)
+    if (mask->metadataEnable && (a.metadataEnable != b.metadataEnable))
     {
-        cout << "in.jpegQuality" << endl;
+        cout << "metadataEnable" << endl;
         return false;
     }
-    if (in.codec != out.codec)
+    if (mask->rtspMulticastIp && (a.rtspMulticastIp != b.rtspMulticastIp))
     {
-        cout << "in.codec" << endl;
+        cout << "rtspMulticastIp" << endl;
         return false;
     }
-    if (in.fitMode != out.fitMode)
+    if (mask->rtspMulticastPort && (a.rtspMulticastPort != b.rtspMulticastPort))
     {
-        cout << "in.fitMode" << endl;
+        cout << "rtspMulticastPort" << endl;
         return false;
     }
-    if (in.cycleTimeMksec != out.cycleTimeMksec)
+    if (mask->user && (a.user != b.user))
     {
-        cout << "in.cycleTimeMksec" << endl;
+        cout << "user" << endl;
         return false;
     }
-    if (in.overlayMode != out.overlayMode)
+    if (mask->password && (a.password != b.password))
     {
-        cout << "in.overlayMode" << endl;
+        cout << "password" << endl;
         return false;
     }
-    if (in.type != out.type)
+    if (mask->suffix && (a.suffix != b.suffix))
     {
-        cout << "in.type" << endl;
+        cout << "suffix" << endl;
         return false;
     }
-    if (in.custom1 != out.custom1)
+    if (mask->metadataSuffix && (a.metadataSuffix != b.metadataSuffix))
     {
-        cout << "in.custom1" << std::endl;
+        cout << "metadataSuffix" << endl;
         return false;
     }
-    if (in.custom2 != out.custom2)
+    if (mask->minBitrateKbps && (a.minBitrateKbps != b.minBitrateKbps))
     {
-        cout << "in.custom2" << std::endl;
+        cout << "minBitrateKbps" << endl;
         return false;
     }
-    if (in.custom3 != out.custom3)
+    if (mask->maxBitrateKbps && (a.maxBitrateKbps != b.maxBitrateKbps))
     {
-        cout << "in.custom3" << std::endl;
+        cout << "maxBitrateKbps" << endl;
         return false;
     }
-
+    if (mask->bitrateKbps && (a.bitrateKbps != b.bitrateKbps))
+    {
+        cout << "bitrateKbps" << endl;
+        return false;
+    }
+    if (mask->bitrateMode && (a.bitrateMode != b.bitrateMode))
+    {
+        cout << "bitrateMode" << endl;
+        return false;
+    }
+    if (mask->fps && (a.fps != b.fps))
+    {
+        cout << "fps" << endl;
+        return false;
+    }
+    if (mask->gop && (a.gop != b.gop))
+    {
+        cout << "gop" << endl;
+        return false;
+    }
+    if (mask->h264Profile && (a.h264Profile != b.h264Profile))
+    {
+        cout << "h264Profile" << endl;
+        return false;
+    }
+    if (mask->jpegQuality && (a.jpegQuality != b.jpegQuality))
+    {
+        cout << "jpegQuality" << endl;
+        return false;
+    }
+    if (mask->codec && (a.codec != b.codec))
+    {
+        cout << "codec" << endl;
+        return false;
+    }
+    if (mask->fitMode && (a.fitMode != b.fitMode))
+    {
+        cout << "fitMode" << endl;
+        return false;
+    }
+    if (mask->cycleTimeUs && (a.cycleTimeUs != b.cycleTimeUs))
+    {
+        cout << "cycleTimeUs" << endl;
+    }
+    if (mask->overlayEnable && (a.overlayEnable != b.overlayEnable))    
+    {
+        cout << "overlayEnable" << endl;
+        return false;
+    }
+    if (mask->type && (a.type != b.type))
+    {
+        cout << "type" << endl;
+        return false;
+    }
+    if (mask->custom1 && (a.custom1 != b.custom1))
+    {
+        cout << "custom1" << endl;
+        return false;
+    }
+    if (mask->custom2 && (a.custom2 != b.custom2))
+    {
+        cout << "custom2" << endl;
+        return false;
+    }
+    if (mask->custom3 && (a.custom3 != b.custom3))
+    {
+        cout << "custom3" << endl;
+        return false;
+    }
+    if (mask->rtspKey && (a.rtspKey != b.rtspKey))
+    {
+        cout << "rtspKey" << endl;
+        return false;
+    }
+    if (mask->rtspCert && (a.rtspCert != b.rtspCert))
+    {
+        cout << "rtspCert" << endl;
+        return false;
+    }
+    if (mask->webRtcKey && (a.webRtcKey != b.webRtcKey))
+    {
+        cout << "webRtcKey" << endl;
+        return false;
+    }
+    if (mask->webRtcCert && (a.webRtcCert != b.webRtcCert))
+    {
+        cout << "webRtcCert" << endl;
+        return false;
+    }
+    if (mask->hlsKey && (a.hlsKey != b.hlsKey))
+    {
+        cout << "hlsKey" << endl;
+        return false;
+    }
+    if (mask->hlsCert && (a.hlsCert != b.hlsCert))
+    {
+        cout << "hlsCert" << endl;
+        return false;
+    }
+    if (mask->rtmpKey && (a.rtmpKey != b.rtmpKey))
+    {
+        cout << "rtmpKey" << endl;
+        return false;
+    }
+    if (mask->rtmpCert && (a.rtmpCert != b.rtmpCert))
+    {
+        cout << "rtmpCert" << endl;
+        return false;
+    }
+    if (mask->rtspEncryption && (a.rtspEncryption != b.rtspEncryption))
+    {
+        cout << "rtspEncryption" << endl;
+        return false;
+    }
+    if (mask->webRtcEncryption && (a.webRtcEncryption != b.webRtcEncryption))
+    {
+        cout << "webRtcEncryption" << endl;
+        return false;
+    }
+    if (mask->rtmpEncryption && (a.rtmpEncryption != b.rtmpEncryption))
+    {
+        cout << "rtmpEncryption" << endl;
+        return false;
+    }
+    if (mask->hlsEncryption && (a.hlsEncryption != b.hlsEncryption))
+    {
+        cout << "hlsEncryption" << endl;
+        return false;
+    }
+    
     return true;
 }
 
 
 
-bool encodeDecodeTest()
+bool copyTest()
 {
     // Prepare random params.
     VStreamerParams in;
-    in.enable = rand() % 2;
-    in.width = rand() % 255;
-    in.height = rand() % 255;
-    in.ip = "afhjaskdm";
-    in.port = rand() % 255;
-    in.multicastIp = "afhjaskdmasd";
-    in.multicastPort = rand() % 255;
-    in.user = "afhidsjfnm";
-    in.password = "adafsodjf";
-    in.suffix = "asdasdasd";
-    in.minBitrateKbps = rand() % 255;
-    in.maxBitrateKbps = rand() % 255;
-    in.bitrateKbps = rand() % 255;
-    in.bitrateMode = rand() % 255;
-    in.fps = rand() % 255;
-    in.gop = true;
-    in.h264Profile = rand() % 255;
-    in.codec = "eydiucnksa";
-    in.fitMode = rand() % 255;
-    in.cycleTimeMksec = rand() % 255;
-    in.overlayMode = rand() % 255;
-    in.type = rand() % 255;
-    in.custom1 = rand() % 255;
-    in.custom2 = rand() % 255;
-    in.custom3 = rand() % 255;
+    fillRandomData(in);
 
-    // Encode data.
+    // Copy params.
+    VStreamerParams out = in;
+
+    // Compare params.
+    return compareParams(in, out);
+}
+
+
+
+bool serializeDeserializeTest()
+{
+    // Prepare random params.
+    VStreamerParams in;
+    fillRandomData(in);
+
+    // Serialize data.
     uint8_t data[1024];
     int size = 0;
-    in.encode(data, 1024, size);
+    in.serialize(data, 1024, size);
 
-    cout << "Encoded data size: " << size << " bytes" << endl;
+    cout << "Serialized data size: " << size << " bytes" << endl;
 
-    // Decode data.
+    // Deserialize data.
     VStreamerParams out;
-    if (!out.decode(data, size))
+    if (!out.deserialize(data, size))
     {
-        cout << "Can't decode data" << endl;
+        cout << "Can't deserialize data" << endl;
         return false;
     }
 
     // Compare params.
-    if (in.enable != out.enable)
-    {
-        cout << "in.enable" << endl;
-        return false;
-    }
-    if (in.width != out.width)
-    {
-        cout << "in.width" << endl;
-        return false;
-    }
-    if (in.height != out.height)
-    {
-        cout << "in.height" << endl;
-        return false;
-    }
-    if (in.ip != out.ip)
-    {
-        cout << "in.ip" << endl;
-        return false;
-    }
-    if (in.port != out.port)
-    {
-        cout << "in.port" << endl;
-        return false;
-    }
-    if (in.multicastIp != out.multicastIp)
-    {
-        cout << "in.multicastIp" << endl;
-        return false;
-    }
-    if (in.multicastPort != out.multicastPort)
-    {
-        cout << "in.multicastPort" << endl;
-        return false;
-    }
-    if (in.user != out.user)
-    {
-        cout << "in.user" << endl;
-        return false;
-    }
-    if (in.password != out.password)
-    {
-        cout << "in.password" << endl;
-        return false;
-    }
-    if (in.suffix != out.suffix)
-    {
-        cout << "in.suffix" << endl;
-        return false;
-    }
-    if (in.minBitrateKbps != out.minBitrateKbps)
-    {
-        cout << "in.minBitrateKbps" << endl;
-        return false;
-    }
-    if (in.maxBitrateKbps != out.maxBitrateKbps)
-    {
-        cout << "in.maxBitrateKbps" << endl;
-        return false;
-    }
-    if (in.bitrateKbps != out.bitrateKbps)
-    {
-        cout << "in.bitrateKbps" << endl;
-        return false;
-    }
-    if (in.bitrateMode != out.bitrateMode)
-    {
-        cout << "in.bitrateMode" << endl;
-        return false;
-    }
-    if (in.fps != out.fps)
-    {
-        cout << "in.fps" << endl;
-        return false;
-    }
-    if (in.gop != out.gop)
-    {
-        cout << "in.gop" << endl;
-        return false;
-    }
-    if (in.h264Profile != out.h264Profile)
-    {
-        cout << "in.h264Profile" << endl;
-        return false;
-    }
-    if (in.jpegQuality != out.jpegQuality)
-    {
-        cout << "in.jpegQuality" << endl;
-        return false;
-    }
-    if (in.codec != out.codec)
-    {
-        cout << "in.codec" << endl;
-        return false;
-    }
-    if (in.fitMode != out.fitMode)
-    {
-        cout << "in.fitMode" << endl;
-        return false;
-    }
-    if (in.cycleTimeMksec != out.cycleTimeMksec)
-    {
-        cout << "in.cycleTimeMksec" << endl;
-        return false;
-    }
-    if (in.overlayMode != out.overlayMode)
-    {
-        cout << "in.overlayMode" << endl;
-        return false;
-    }
-    if (in.type != out.type)
-    {
-        cout << "in.type" << endl;
-        return false;
-    }
-    if ((int)in.custom1 != (int)out.custom1)
-    {
-        cout << "in.custom1" << endl;
-        return false;
-    }
-    if (in.custom2 != out.custom2)
-    {
-        cout << "in.custom2" << endl;
-        return false;
-    }
-    if (in.custom3 != out.custom3)
-    {
-        cout << "in.custom3" << endl;
-        return false;
-    }
-
-    return true;
+    return compareParams(in, out);
 }
 
 
@@ -486,30 +510,7 @@ bool jsonReadWriteTest()
 {
     // Prepare random params.
     VStreamerParams in;
-    in.enable = rand() % 2;
-    in.width = rand() % 255;
-    in.height = rand() % 255;
-    in.ip = "afhjaskdm";
-    in.port = rand() % 255;
-    in.multicastIp = "afhjaskdmasd";
-    in.multicastPort = rand() % 255;
-    in.user = "afhidsjfnm";
-    in.password = "adafsodjf";
-    in.suffix = "asdasdasd";
-    in.minBitrateKbps = rand() % 255;
-    in.maxBitrateKbps = rand() % 255;
-    in.bitrateKbps = rand() % 255;
-    in.bitrateMode = rand() % 255;
-    in.fps = rand() % 255;
-    in.gop = true;
-    in.h264Profile = rand() % 255;
-    in.codec = "eydiucnksa";
-    in.fitMode = rand() % 255;
-    in.overlayMode = rand() % 255;
-    in.type = rand() % 255;
-    in.custom1 = rand() % 255;
-    in.custom2 = rand() % 255;
-    in.custom3 = rand() % 255;
+    fillRandomData(in);
 
     // Write params to file.
     cr::utils::ConfigReader inConfig;
@@ -532,341 +533,87 @@ bool jsonReadWriteTest()
     }
 
     // Compare params.
-    if (in.enable != out.enable)
-    {
-        cout << "in.enable" << endl;
-        return false;
-    }
-    if (in.width != out.width)
-    {
-        cout << "in.width" << endl;
-        return false;
-    }
-    if (in.height != out.height)
-    {
-        cout << "in.height" << endl;
-        return false;
-    }
-    if (in.ip != out.ip)
-    {
-        cout << "in.ip" << endl;
-        return false;
-    }
-    if (in.port != out.port)
-    {
-        cout << "in.port" << endl;
-        return false;
-    }
-    if (in.multicastIp != out.multicastIp)
-    {
-        cout << "in.multicastIp" << endl;
-        return false;
-    }
-    if (in.multicastPort != out.multicastPort)
-    {
-        cout << "in.multicastPort" << endl;
-        return false;
-    }
-    if (in.user != out.user)
-    {
-        cout << "in.user" << endl;
-        return false;
-    }
-    if (in.password != out.password)
-    {
-        cout << "in.password" << endl;
-        return false;
-    }
-    if (in.suffix != out.suffix)
-    {
-        cout << "in.suffix" << endl;
-        return false;
-    }
-    if (in.minBitrateKbps != out.minBitrateKbps)
-    {
-        cout << "in.minBitrateKbps" << endl;
-        return false;
-    }
-    if (in.maxBitrateKbps != out.maxBitrateKbps)
-    {
-        cout << "in.maxBitrateKbps" << endl;
-        return false;
-    }
-    if (in.bitrateKbps != out.bitrateKbps)
-    {
-        cout << "in.bitrateKbps" << endl;
-        return false;
-    }
-    if (in.bitrateMode != out.bitrateMode)
-    {
-        cout << "in.bitrateMode" << endl;
-        return false;
-    }
-    if (in.fps != out.fps)
-    {
-        cout << "in.fps" << endl;
-        return false;
-    }
-    if (in.gop != out.gop)
-    {
-        cout << "in.gop" << endl;
-        return false;
-    }
-    if (in.h264Profile != out.h264Profile)
-    {
-        cout << "in.h264Profile" << endl;
-        return false;
-    }
-    if (in.jpegQuality != out.jpegQuality)
-    {
-        cout << "in.jpegQuality" << endl;
-        return false;
-    }
-    if (in.codec != out.codec)
-    {
-        cout << "in.codec" << endl;
-        return false;
-    }
-    if (in.fitMode != out.fitMode)
-    {
-        cout << "in.fitMode" << endl;
-        return false;
-    }
-    if (in.overlayMode != out.overlayMode)
-    {
-        cout << "in.overlayMode" << endl;
-        return false;
-    }
-    if (in.type != out.type)
-    {
-        cout << "in.type" << endl;
-        return false;
-    }
-    if (in.custom1 != out.custom1)
-    {
-        cout << "in.custom1" << endl;
-        return false;
-    }
-    if (in.custom2 != out.custom2)
-    {
-        cout << "in.custom2" << endl;
-        return false;
-    }
-    if (in.custom3 != out.custom3)
-    {
-        cout << "in.custom3" << endl;
-        return false;
-    }
-
-    return true;
+    return compareParams(in, out);
 }
 
 
 
-bool encodeDecodeWithMaskTest()
+bool serializeDeserializeWithMaskTest()
 {
     // Prepare random params.
     VStreamerParams in;
-    in.enable = rand() % 2;
-    in.width = rand() % 255;
-    in.height = rand() % 255;
-    in.ip = "afhjaskdm";
-    in.port = rand() % 255;
-    in.multicastIp = "afhjaskdmasd";
-    in.multicastPort = rand() % 255;
-    in.user = "afhidsjfnm";
-    in.password = "adafsodjf";
-    in.suffix = "asdasdasd";
-    in.minBitrateKbps = rand() % 255;
-    in.maxBitrateKbps = rand() % 255;
-    in.bitrateKbps = rand() % 255;
-    in.bitrateMode = rand() % 255;
-    in.fps = rand() % 255;
-    in.gop = true;
-    in.h264Profile = rand() % 255;
-    in.codec = "eydiucnksa";
-    in.fitMode = rand() % 255;
-    in.cycleTimeMksec = rand() % 255;
-    in.overlayMode = rand() % 255;
-    in.type = rand() % 255;
-    in.custom1 = rand() % 255;
-    in.custom2 = rand() % 255;
-    in.custom3 = rand() % 255;
+    fillRandomData(in);
 
-    // Prepare params mask.
+    // Prepare random params mask.
     VStreamerParamsMask mask;
     mask.enable = true;
-    mask.width = false;
-    mask.height = true;
-    mask.ip = false;
-    mask.port = true;
-    mask.multicastIp = false;
-    mask.multicastPort = true;
+    mask.width = true;
+    mask.height = false;
+    mask.ip = true;
+    mask.rtspPort = true;
+    mask.rtpPort = false;
+    mask.webRtcPort = true;
+    mask.hlsPort = false;
+    mask.srtPort = false;
+    mask.rtmpPort = false;
+    mask.metadataPort = true;
+    mask.rtspEnable = true;
+    mask.rtpEnable = true;
+    mask.webRtcEnable = false;
+    mask.hlsEnable = false;
+    mask.srtEnable = true;
+    mask.rtmpEnable = true;
+    mask.metadataEnable = false;
+    mask.rtspMulticastIp = true;
+    mask.rtspMulticastPort = false;
     mask.user = false;
-    mask.password = true;
+    mask.password = false;
     mask.suffix = false;
+    mask.metadataSuffix = true;
     mask.minBitrateKbps = true;
     mask.maxBitrateKbps = false;
     mask.bitrateKbps = true;
     mask.bitrateMode = false;
     mask.fps = true;
-    mask.gop = false;
+    mask.gop = true;
     mask.h264Profile = true;
     mask.jpegQuality = false;
-    mask.codec = true;
+    mask.codec = false;
     mask.fitMode = false;
-    mask.cycleTimeMksec = true;
-    mask.overlayMode = false;
+    mask.cycleTimeUs = false;
+    mask.overlayEnable = true;
     mask.type = true;
-    mask.custom1 = false;
-    mask.custom2 = true;
-    mask.custom3 = false;
+    mask.custom1 = true;
+    mask.custom2 = false;
+    mask.custom3 = true;
+    mask.rtspKey = true;
+    mask.rtspCert = false;
+    mask.webRtcKey = true;
+    mask.webRtcCert = false;
+    mask.hlsKey = true;
+    mask.hlsCert = true;
+    mask.rtmpKey = false;
+    mask.rtmpCert = false;
+    mask.rtspEncryption = false;
+    mask.webRtcEncryption = true;
+    mask.rtmpEncryption = false;
+    mask.hlsEncryption = true;
 
     // Encode data.
     uint8_t data[1024];
     int size = 0;
-    in.encode(data, 1024, size, &mask);
+    in.serialize(data, 1024, size, &mask);
 
-    cout << "Encoded data size: " << size << " bytes" << endl;
+    cout << "Serialized data size: " << size << " bytes" << endl;
 
     // Decode data.
     VStreamerParams out;
-    if (!out.decode(data, size))
+    if (!out.deserialize(data, size))
     {
-        cout << "Can't decode data" << endl;
+        cout << "Can't deserialize data" << endl;
         return false;
     }
 
     // Compare params.
-    if (in.enable != out.enable)
-    {
-        cout << "in.enable" << endl;
-        return false;
-    }
-    if (0 != out.width)
-    {
-        cout << "in.width" << endl;
-        return false;
-    }
-    if (in.height != out.height)
-    {
-        cout << "in.height" << endl;
-        return false;
-    }
-    if ("" != out.ip)
-    {
-        cout << "in.ip" << endl;
-        return false;
-    }
-    if (in.port != out.port)
-    {
-        cout << "in.port" << endl;
-        return false;
-    }
-    if ("" != out.multicastIp)
-    {
-        cout << "in.multicastIp" << endl;
-        return false;
-    }
-    if (in.multicastPort != out.multicastPort)
-    {
-        cout << "in.multicastPort" << endl;
-        return false;
-    }
-    if ("" != out.user)
-    {
-        cout << "in.user" << endl;
-        return false;
-    }
-    if (in.password != out.password)
-    {
-        cout << "in.password" << endl;
-        return false;
-    }
-    if ("" != out.suffix)
-    {
-        cout << "in.suffix" << endl;
-        return false;
-    }
-    if (in.minBitrateKbps != out.minBitrateKbps)
-    {
-        cout << "in.minBitrateKbps" << endl;
-        return false;
-    }
-    if (0 != out.maxBitrateKbps)
-    {
-        cout << "in.maxBitrateKbps" << endl;
-        return false;
-    }
-    if (in.bitrateKbps != out.bitrateKbps)
-    {
-        cout << "in.bitrateKbps" << endl;
-        return false;
-    }
-    if (0 != out.bitrateMode)
-    {
-        cout << "in.bitrateMode" << endl;
-        return false;
-    }
-    if (in.fps != out.fps)
-    {
-        cout << "in.fps" << endl;
-        return false;
-    }
-    if (0 != out.gop)
-    {
-        cout << "in.gop" << endl;
-        return false;
-    }
-    if (in.h264Profile != out.h264Profile)
-    {
-        cout << "in.h264Profile" << endl;
-        return false;
-    }
-    if (0 != out.jpegQuality)
-    {
-        cout << "in.jpegQuality" << endl;
-        return false;
-    }
-    if (in.codec != out.codec)
-    {
-        cout << "in.codec" << endl;
-        return false;
-    }
-    if (-1 != out.fitMode)
-    {
-        cout << "in.fitMode" << endl;
-        return false;
-    }
-    if (in.cycleTimeMksec != out.cycleTimeMksec)
-    {
-        cout << "in.cycleTimeMksec" << endl;
-        return false;
-    }
-    if (false != out.overlayMode)
-    {
-        cout << "in.overlayMode" << endl;
-        return false;
-    }
-    if (in.type != out.type)
-    {
-        cout << "in.type" << endl;
-        return false;
-    }
-    if (-1 != out.custom1)
-    {
-        cout << "in.custom1" << endl;
-        return false;
-    }
-    if (in.custom2 != out.custom2)
-    {
-        cout << "in.custom2" << endl;
-        return false;
-    }
-    if (-1 != out.custom3)
-    {
-        cout << "in.custom3" << endl;
-        return false;
-    }
-    return true;
+    return compareParams(in, out, &mask);
 }

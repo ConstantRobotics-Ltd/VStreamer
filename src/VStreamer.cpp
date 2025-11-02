@@ -1,12 +1,14 @@
 #include "VStreamer.h"
 #include "VStreamerVersion.h"
+#include <string>
+#include <cstring>
 
 
-
+// Macro to check bit in byte.
 #define checkBit(byte, position) ((byte) & (1 << (position)))
 
 
-
+// Link namespaces.
 using namespace cr::video;
 using namespace std;
 
@@ -26,323 +28,35 @@ string VStreamer::getVersion()
 
 
 
-VStreamerParams &VStreamerParams::operator=(const VStreamerParams &src)
-{
-    // Check yourself.
-    if (this == &src)
-        return *this;
-
-    // Copy params.
-    enable = src.enable;
-    width = src.width;
-    height = src.height;
-    ip = src.ip;
-    port = src.port;
-    multicastIp = src.multicastIp;
-    multicastPort = src.multicastPort;
-    user = src.user;
-    password = src.password;
-    suffix = src.suffix;
-    minBitrateKbps = src.minBitrateKbps;
-    maxBitrateKbps = src.maxBitrateKbps;
-    bitrateKbps = src.bitrateKbps;
-    bitrateMode = src.bitrateMode;
-    fps = src.fps;
-    gop = src.gop;
-    h264Profile = src.h264Profile;
-    jpegQuality = src.jpegQuality;
-    codec = src.codec;
-    fitMode = src.fitMode;
-    cycleTimeMksec = src.cycleTimeMksec;
-    overlayMode = src.overlayMode;
-    type = src.type;
-    custom1 = src.custom1;
-    custom2 = src.custom2;
-    custom3 = src.custom3;
-
-    return *this;
-}
-
-
-
-bool VStreamerParams::encode(uint8_t *data, int bufferSize, int &size, VStreamerParamsMask *mask)
+bool VStreamerParams::serialize(uint8_t *data, int bufferSize, int &size, VStreamerParamsMask *mask)
 {
     // Check buffer size.
-    if (bufferSize < 8)
+    if (bufferSize < 11) // Header + one bool parameter.
     {
         size = 0;
         return false;
     }
 
-    /*
-        0 = header with value 0x02
-        1 and 2 = versions
-        3, 4, 5 and 6 = Masks
-        7 = int size from source system in terms bytes
-        8 = start of actual data.
-    */
+    // Fill header.
+    data[0] = 0x02; // Header.
+    data[1] = VSTREAMER_MAJOR_VERSION; // Major version.
+    data[2] = VSTREAMER_MINOR_VERSION; // Minor version.
+    data[3] = 0; // Parameter mask byte 1
+    data[4] = 0; // Parameter mask byte 2
+    data[5] = 0; // Parameter mask byte 3
+    data[6] = 0; // Parameter mask byte 4
+    data[7] = 0; // Parameter mask byte 5
+    data[8] = 0; // Parameter mask byte 6
+    data[9] = 0; // Parameter mask byte 7
 
-    // Encode version.
-    int pos = 0;
-    data[0] = 0x02;
-    data[1] = VSTREAMER_MAJOR_VERSION;
-    data[2] = VSTREAMER_MINOR_VERSION;
-    data[3] = 0;
-    data[4] = 0;
-    data[5] = 0;
-    data[6] = 0;
-    data[7] = sizeof(int);
-
-    size = 8;
-    pos = 8;
-
+    // If mask is not initialized then encode all parameters.
+    VStreamerParamsMask defaultMask;
     if (mask == nullptr)
-    {
-        // start of actual data.
+        mask = &defaultMask;
+    
+    // Fill data.
+    int pos = 10;
 
-        if (bufferSize < pos + sizeof(bool))
-        {
-            size = pos;
-            return true;
-        }
-        memcpy(&data[pos], &enable, sizeof(bool));
-        pos += sizeof(bool);
-        data[3] |= (1 << 7);
-
-        if (bufferSize < pos + sizeof(int))
-        {
-            size = pos;
-            return true;
-        }
-        memcpy(&data[pos], &width, sizeof(int));
-        pos += sizeof(int);
-        data[3] |= (1 << 6);
-
-        if (bufferSize < pos + sizeof(int))
-        {
-            size = pos;
-            return true;
-        }
-        memcpy(&data[pos], &height, sizeof(int));
-        pos += sizeof(int);
-        data[3] |= (1 << 5);
-
-        if (bufferSize < pos + ip.size() + 1)
-        {
-            size = pos;
-            return true;
-        }
-        memcpy(&data[pos], ip.c_str(), ip.size() + 1);
-        pos += ip.size() + 1;
-        data[3] |= (1 << 4);
-
-        if (bufferSize < pos + sizeof(int))
-        {
-            size = pos;
-            return true;
-        }
-        memcpy(&data[pos], &port, sizeof(int));
-        pos += sizeof(int);
-        data[3] |= (1 << 3);
-
-        if (bufferSize < pos + user.size() + 1)
-        {
-            size = pos;
-            return true;
-        }
-        memcpy(&data[pos], user.c_str(), user.size() + 1);
-        pos += user.size() + 1;
-        data[3] |= (1 << 2);
-
-        if (bufferSize < pos + suffix.size() + 1)
-        {
-            size = pos;
-            return true;
-        }
-        memcpy(&data[pos], suffix.c_str(), suffix.size() + 1);
-        pos += suffix.size() + 1;
-        data[3] |= (1 << 1);
-
-        if (bufferSize < pos + sizeof(int))
-        {
-            size = pos;
-            return true;
-        }
-        memcpy(&data[pos], &minBitrateKbps, sizeof(int));
-        pos += sizeof(int);
-        data[3] |= (1 << 0);
-
-        if (bufferSize < pos + sizeof(int))
-        {
-            size = pos;
-            return true;
-        }
-        memcpy(&data[pos], &maxBitrateKbps, sizeof(int));
-        pos += sizeof(int);
-        data[4] |= (1 << 7);
-
-        if (bufferSize < pos + sizeof(int))
-        {
-            size = pos;
-            return true;
-        }
-        memcpy(&data[pos], &bitrateKbps, sizeof(int));
-        pos += sizeof(int);
-        data[4] |= (1 << 6);
-
-        if (bufferSize < pos + sizeof(int))
-        {
-            size = pos;
-            return true;
-        }
-        memcpy(&data[pos], &bitrateMode, sizeof(int));
-        pos += sizeof(int);
-        data[4] |= (1 << 5);
-
-        if (bufferSize < pos + sizeof(int))
-        {
-            size = pos;
-            return true;
-        }
-        int tempFps = fps;
-        memcpy(&data[pos], &tempFps, sizeof(int));
-        pos += sizeof(int);
-        data[4] |= (1 << 4);
-
-        if (bufferSize < pos + sizeof(int))
-        {
-            size = pos;
-            return true;
-        }
-        memcpy(&data[pos], &gop, sizeof(int));
-        pos += sizeof(int);
-        data[4] |= (1 << 3);
-
-        if (bufferSize < pos + sizeof(int))
-        {
-            size = pos;
-            return true;
-        }
-        memcpy(&data[pos], &h264Profile, sizeof(int));
-        pos += sizeof(int);
-        data[4] |= (1 << 2);
-
-        if (bufferSize < pos + sizeof(int))
-        {
-            size = pos;
-            return true;
-        }
-        memcpy(&data[pos], &jpegQuality, sizeof(int));
-        pos += sizeof(int);
-        data[4] |= (1 << 1);
-
-        if (bufferSize < pos + codec.size() + 1)
-        {
-            size = pos;
-            return true;
-        }
-        memcpy(&data[pos], codec.c_str(), codec.size() + 1);
-        pos += codec.size() + 1;
-        data[5] |= (1 << 7);
-
-        if (bufferSize < pos + sizeof(int))
-        {
-            size = pos;
-            return true;
-        }
-        memcpy(&data[pos], &fitMode, sizeof(int));
-        pos += sizeof(int);
-        data[5] |= (1 << 6);
-
-        if (bufferSize < pos + sizeof(int))
-        {
-            size = pos;
-            return true;
-        }
-        memcpy(&data[pos], &cycleTimeMksec, sizeof(int));
-        pos += sizeof(int);
-        data[5] |= (1 << 5);
-
-        if (bufferSize < pos + password.size() + 1)
-        {
-            size = pos;
-            return true;
-        }
-        memcpy(&data[pos], password.c_str(), password.size() + 1);
-        pos += password.size() + 1;
-        data[5] |= (1 << 4);
-
-        if (bufferSize < pos + sizeof(bool))
-        {
-            size = pos;
-            return true;
-        }
-        memcpy(&data[pos], &overlayMode, sizeof(bool));
-        pos += sizeof(bool);
-        data[5] |= (1 << 3);
-
-        if (bufferSize < pos + sizeof(int))
-        {
-            size = pos;
-            return true;
-        }
-        memcpy(&data[pos], &type, sizeof(int));
-        pos += sizeof(int);
-        data[5] |= (1 << 2);
-
-        if (bufferSize < pos + sizeof(int))
-        {
-            size = pos;
-            return true;
-        }
-        int tempCustom1 = custom1;
-        memcpy(&data[pos], &tempCustom1, sizeof(int));
-        pos += sizeof(int);
-        data[5] |= (1 << 1);
-
-        if (bufferSize < pos + sizeof(int))
-        {
-            size = pos;
-            return true;
-        }
-        int tempCustom2 = custom2;
-        memcpy(&data[pos], &tempCustom2, sizeof(int));
-        pos += sizeof(int);
-        data[5] |= (1 << 0);
-
-        if (bufferSize < pos + sizeof(int))
-        {
-            size = pos;
-            return true;
-        }
-        int tempCustom3 = custom3;
-        memcpy(&data[pos], &tempCustom3, sizeof(int));
-        pos += sizeof(int);
-        data[6] |= (1 << 7);
-
-        if (bufferSize < pos + multicastIp.size() + 1)
-        {
-            size = pos;
-            return true;
-        }
-        memcpy(&data[pos], multicastIp.c_str(), multicastIp.size() + 1);
-        pos += multicastIp.size() + 1;
-        data[6] |= (1 << 6);
-
-        if (bufferSize < pos + sizeof(int))
-        {
-            size = pos;
-            return true;
-        }
-        memcpy(&data[pos], &multicastPort, sizeof(int));
-        pos += sizeof(int);
-        data[6] |= (1 << 5);
-
-        size = pos;
-        return true;
-    }
-
-    // start of actual data with masks.
     if (mask->enable && (bufferSize > pos + sizeof(bool)))
     {
         memcpy(&data[pos], &enable, sizeof(bool));
@@ -371,162 +85,340 @@ bool VStreamerParams::encode(uint8_t *data, int bufferSize, int &size, VStreamer
         data[3] |= (1 << 4);
     }
 
-    if (mask->port && (bufferSize > pos + sizeof(int)))
+    if (mask->rtspPort && (bufferSize > pos + sizeof(int)))
     {
-        memcpy(&data[pos], &port, sizeof(int));
+        memcpy(&data[pos], &rtspPort, sizeof(int));
         pos += sizeof(int);
         data[3] |= (1 << 3);
+    }
+
+    if (mask->rtpPort && (bufferSize > pos + sizeof(int)))
+    {
+        memcpy(&data[pos], &rtpPort, sizeof(int));
+        pos += sizeof(int);
+        data[3] |= (1 << 2);
+    }
+
+    if (mask->webRtcPort && (bufferSize > pos + sizeof(int)))
+    {
+        memcpy(&data[pos], &webRtcPort, sizeof(int));
+        pos += sizeof(int);
+        data[3] |= (1 << 1);
+    }
+
+    if (mask->hlsPort && (bufferSize > pos + sizeof(int)))
+    {
+        memcpy(&data[pos], &hlsPort, sizeof(int));
+        pos += sizeof(int);
+        data[3] |= (1 << 0);
+    }
+
+    if (mask->srtPort && (bufferSize > pos + sizeof(int)))
+    {
+        memcpy(&data[pos], &srtPort, sizeof(int));
+        pos += sizeof(int);
+        data[4] |= (1 << 7);
+    }
+
+    if (mask->rtmpPort && (bufferSize > pos + sizeof(int)))
+    {
+        memcpy(&data[pos], &rtmpPort, sizeof(int));
+        pos += sizeof(int);
+        data[4] |= (1 << 6);
+    }
+
+    if (mask->metadataPort && (bufferSize > pos + sizeof(int)))
+    {
+        memcpy(&data[pos], &metadataPort, sizeof(int));
+        pos += sizeof(int);
+        data[4] |= (1 << 5);
+    }
+
+    if (mask->rtspEnable && (bufferSize > pos + sizeof(bool)))
+    {
+        memcpy(&data[pos], &rtspEnable, sizeof(bool));
+        pos += sizeof(bool);
+        data[4] |= (1 << 4);
+    }
+
+    if (mask->rtpEnable && (bufferSize > pos + sizeof(bool)))
+    {
+        memcpy(&data[pos], &rtpEnable, sizeof(bool));
+        pos += sizeof(bool);
+        data[4] |= (1 << 3);
+    }
+
+    if (mask->webRtcEnable && (bufferSize > pos + sizeof(bool)))
+    {
+        memcpy(&data[pos], &webRtcEnable, sizeof(bool));
+        pos += sizeof(bool);
+        data[4] |= (1 << 2);
+    }
+
+    if (mask->hlsEnable && (bufferSize > pos + sizeof(bool)))
+    {
+        memcpy(&data[pos], &hlsEnable, sizeof(bool));
+        pos += sizeof(bool);
+        data[4] |= (1 << 1);
+    }
+
+    if (mask->srtEnable && (bufferSize > pos + sizeof(bool)))
+    {
+        memcpy(&data[pos], &srtEnable, sizeof(bool));
+        pos += sizeof(bool);
+        data[4] |= (1 << 0);
+    }
+
+    if (mask->rtmpEnable && (bufferSize > pos + sizeof(bool)))
+    {
+        memcpy(&data[pos], &rtmpEnable, sizeof(bool));
+        pos += sizeof(bool);
+        data[5] |= (1 << 7);
+    }
+
+    if (mask->metadataEnable && (bufferSize > pos + sizeof(bool)))
+    {
+        memcpy(&data[pos], &metadataEnable, sizeof(bool));
+        pos += sizeof(bool);
+        data[5] |= (1 << 6);
+    }
+
+    if (mask->rtspMulticastIp && (bufferSize > pos + rtspMulticastIp.size() + 1))
+    {
+        memcpy(&data[pos], rtspMulticastIp.c_str(), rtspMulticastIp.size() + 1);
+        pos += rtspMulticastIp.size() + 1;
+        data[5] |= (1 << 5);
+    }
+
+    if (mask->rtspMulticastPort && (bufferSize > pos + sizeof(int)))
+    {
+        memcpy(&data[pos], &rtspMulticastPort, sizeof(int));
+        pos += sizeof(int);
+        data[5] |= (1 << 4);
     }
 
     if (mask->user && (bufferSize > pos + user.size() + 1))
     {
         memcpy(&data[pos], user.c_str(), user.size() + 1);
         pos += user.size() + 1;
-        data[3] |= (1 << 2);
-    }
-
-    if (mask->suffix && (bufferSize > pos + user.size() + 1))
-    {
-        memcpy(&data[pos], suffix.c_str(), suffix.size() + 1);
-        pos += suffix.size() + 1;
-        data[3] |= (1 << 1);
-    }
-
-    if (mask->minBitrateKbps && (bufferSize > pos + sizeof(int)))
-    {
-        memcpy(&data[pos], &minBitrateKbps, sizeof(int));
-        pos += sizeof(int);
-        data[3] |= (1 << 0);
-    }
-
-    if (mask->maxBitrateKbps && (bufferSize > pos + sizeof(int)))
-    {
-        memcpy(&data[pos], &maxBitrateKbps, sizeof(int));
-        pos += sizeof(int);
-        data[4] |= (1 << 7);
-    }
-
-    if (mask->bitrateKbps && (bufferSize > pos + sizeof(int)))
-    {
-        memcpy(&data[pos], &bitrateKbps, sizeof(int));
-        pos += sizeof(int);
-        data[4] |= (1 << 6);
-    }
-
-    if (mask->bitrateMode && (bufferSize > pos + sizeof(int)))
-    {
-        memcpy(&data[pos], &bitrateMode, sizeof(int));
-        pos += sizeof(int);
-        data[4] |= (1 << 5);
-    }
-
-    if (mask->fps && (bufferSize > pos + sizeof(int)))
-    {
-        int tempFps = fps;
-        memcpy(&data[pos], &tempFps, sizeof(int));
-        pos += sizeof(int);
-        data[4] |= (1 << 4);
-    }
-
-    if (mask->gop && (bufferSize > pos + sizeof(int)))
-    {
-        memcpy(&data[pos], &gop, sizeof(int));
-        pos += sizeof(int);
-        data[4] |= (1 << 3);
-    }
-
-    if (mask->h264Profile && (bufferSize > pos + sizeof(int)))
-    {
-        memcpy(&data[pos], &h264Profile, sizeof(int));
-        pos += sizeof(int);
-        data[4] |= (1 << 2);
-    }
-
-    if (mask->jpegQuality && (bufferSize > pos + sizeof(int)))
-    {
-        memcpy(&data[pos], &jpegQuality, sizeof(int));
-        pos += sizeof(int);
-        data[4] |= (1 << 1);
-    }
-
-    if (mask->codec && (bufferSize > pos + user.size() + 1))
-    {
-        memcpy(&data[pos], codec.c_str(), codec.size() + 1);
-        pos += codec.size() + 1;
-        data[5] |= (1 << 7);
-    }
-
-    if (mask->fitMode && (bufferSize > pos + sizeof(int)))
-    {
-        memcpy(&data[pos], &fitMode, sizeof(int));
-        pos += sizeof(int);
-        data[5] |= (1 << 6);
-    }
-
-    if (mask->cycleTimeMksec && (bufferSize > pos + sizeof(int)))
-    {
-        memcpy(&data[pos], &cycleTimeMksec, sizeof(int));
-        pos += sizeof(int);
-        data[5] |= (1 << 5);
+        data[5] |= (1 << 3);
     }
 
     if (mask->password && (bufferSize > pos + password.size() + 1))
     {
         memcpy(&data[pos], password.c_str(), password.size() + 1);
         pos += password.size() + 1;
-        data[5] |= (1 << 4);
+        data[5] |= (1 << 2);
     }
 
-    if (mask->overlayMode && (bufferSize > pos + sizeof(bool)))
+    if (mask->suffix && (bufferSize > pos + suffix.size() + 1))
     {
-        memcpy(&data[pos], &overlayMode, sizeof(bool));
+        memcpy(&data[pos], suffix.c_str(), suffix.size() + 1);
+        pos += suffix.size() + 1;
+        data[5] |= (1 << 1);
+    }
+
+    if (mask->metadataSuffix && (bufferSize > pos + metadataSuffix.size() + 1))
+    {
+        memcpy(&data[pos], metadataSuffix.c_str(), metadataSuffix.size() + 1);
+        pos += metadataSuffix.size() + 1;
+        data[5] |= (1 << 0);
+    }
+
+    if (mask->minBitrateKbps && (bufferSize > pos + sizeof(int)))
+    {
+        memcpy(&data[pos], &minBitrateKbps, sizeof(int));
+        pos += sizeof(int);
+        data[6] |= (1 << 7);
+    }
+
+    if (mask->maxBitrateKbps && (bufferSize > pos + sizeof(int)))
+    {
+        memcpy(&data[pos], &maxBitrateKbps, sizeof(int));
+        pos += sizeof(int);
+        data[6] |= (1 << 6);
+    }
+
+    if (mask->bitrateKbps && (bufferSize > pos + sizeof(int)))
+    {
+        memcpy(&data[pos], &bitrateKbps, sizeof(int));
+        pos += sizeof(int);
+        data[6] |= (1 << 5);
+    }
+
+    if (mask->bitrateMode && (bufferSize > pos + sizeof(int)))
+    {
+        memcpy(&data[pos], &bitrateMode, sizeof(int));
+        pos += sizeof(int);
+        data[6] |= (1 << 4);
+    }
+
+    if (mask->fps && (bufferSize > pos + sizeof(float)))
+    {
+        memcpy(&data[pos], &fps, sizeof(float));
+        pos += sizeof(float);
+        data[6] |= (1 << 3);
+    }
+
+    if (mask->gop && (bufferSize > pos + sizeof(int)))
+    {
+        memcpy(&data[pos], &gop, sizeof(int));
+        pos += sizeof(int);
+        data[6] |= (1 << 2);
+    }
+
+    if (mask->h264Profile && (bufferSize > pos + sizeof(int)))
+    {
+        memcpy(&data[pos], &h264Profile, sizeof(int));
+        pos += sizeof(int);
+        data[6] |= (1 << 1);
+    }
+
+    if (mask->jpegQuality && (bufferSize > pos + sizeof(int)))
+    {
+        memcpy(&data[pos], &jpegQuality, sizeof(int));
+        pos += sizeof(int);
+        data[6] |= (1 << 0);
+    }
+
+    if (mask->codec && (bufferSize > pos + codec.size() + 1))
+    {
+        memcpy(&data[pos], codec.c_str(), codec.size() + 1);
+        pos += codec.size() + 1;
+        data[7] |= (1 << 7);
+    }
+
+    if (mask->fitMode && (bufferSize > pos + sizeof(int)))
+    {
+        memcpy(&data[pos], &fitMode, sizeof(int));
+        pos += sizeof(int);
+        data[7] |= (1 << 6);
+    }
+
+    if (mask->cycleTimeUs && (bufferSize > pos + sizeof(int)))
+    {
+        memcpy(&data[pos], &cycleTimeUs, sizeof(int));
+        pos += sizeof(int);
+        data[7] |= (1 << 5);
+    }
+
+    if (mask->overlayEnable && (bufferSize > pos + sizeof(bool)))
+    {
+        memcpy(&data[pos], &overlayEnable, sizeof(bool));
         pos += sizeof(bool);
-        data[5] |= (1 << 3);
+        data[7] |= (1 << 4);
     }
 
     if (mask->type && (bufferSize > pos + sizeof(int)))
     {
         memcpy(&data[pos], &type, sizeof(int));
         pos += sizeof(int);
-        data[5] |= (1 << 2);
+        data[7] |= (1 << 3);
     }
 
-    if (mask->custom1 && (bufferSize > pos + sizeof(int)))
+    if (mask->custom1 && (bufferSize > pos + sizeof(float)))
     {
-        int tempCustom1 = custom1;
-        memcpy(&data[pos], &tempCustom1, sizeof(int));
-        pos += sizeof(int);
-        data[5] |= (1 << 1);
+        memcpy(&data[pos], &custom1, sizeof(float));
+        pos += sizeof(float);
+        data[7] |= (1 << 2);
     }
 
-    if (mask->custom2 && (bufferSize > pos + sizeof(int)))
+    if (mask->custom2 && (bufferSize > pos + sizeof(float)))
     {
-        int tempCustom2 = custom2;
-        memcpy(&data[pos], &tempCustom2, sizeof(int));
-        pos += sizeof(int);
-        data[5] |= (1 << 0);
+        memcpy(&data[pos], &custom2, sizeof(float));
+        pos += sizeof(float);
+        data[7] |= (1 << 1);
     }
 
-    if (mask->custom3 && (bufferSize > pos + sizeof(int)))
+    if (mask->custom3 && (bufferSize > pos + sizeof(float)))
     {
-        int tempCustom3 = custom3;
-        memcpy(&data[pos], &tempCustom3, sizeof(int));
-        pos += sizeof(int);
-        data[6] |= (1 << 7);
+        memcpy(&data[pos], &custom3, sizeof(float));
+        pos += sizeof(float);
+        data[7] |= (1 << 0);
     }
 
-    if (mask->multicastIp && (bufferSize > pos + multicastIp.size() + 1))
+    if (mask->rtspKey && (bufferSize > pos + rtspKey.size() + 1))
     {
-        memcpy(&data[pos], multicastIp.c_str(), multicastIp.size() + 1);
-        pos += multicastIp.size() + 1;
-        data[6] |= (1 << 6);
+        memcpy(&data[pos], rtspKey.c_str(), rtspKey.size() + 1);
+        pos += rtspKey.size() + 1;
+        data[8] |= (1 << 7);
     }
 
-    if (mask->multicastPort && (bufferSize > pos + sizeof(int)))
+    if (mask->rtspCert && (bufferSize > pos + rtspCert.size() + 1))
     {
-        memcpy(&data[pos], &multicastPort, sizeof(int));
-        pos += sizeof(int);
-        data[6] |= (1 << 5);
+        memcpy(&data[pos], rtspCert.c_str(), rtspCert.size() + 1);
+        pos += rtspCert.size() + 1;
+        data[8] |= (1 << 6);
+    }
+
+    if (mask->webRtcKey && (bufferSize > pos + webRtcKey.size() + 1))
+    {
+        memcpy(&data[pos], webRtcKey.c_str(), webRtcKey.size() + 1);
+        pos += webRtcKey.size() + 1;
+        data[8] |= (1 << 5);
+    }
+
+    if (mask->webRtcCert && (bufferSize > pos + webRtcCert.size() + 1))
+    {
+        memcpy(&data[pos], webRtcCert.c_str(), webRtcCert.size() + 1);
+        pos += webRtcCert.size() + 1;
+        data[8] |= (1 << 4);
+    }
+
+    if (mask->hlsKey && (bufferSize > pos + hlsKey.size() + 1))
+    {
+        memcpy(&data[pos], hlsKey.c_str(), hlsKey.size() + 1);
+        pos += hlsKey.size() + 1;
+        data[8] |= (1 << 3);
+    }
+
+    if (mask->hlsCert && (bufferSize > pos + hlsCert.size() + 1))
+    {
+        memcpy(&data[pos], hlsCert.c_str(), hlsCert.size() + 1);
+        pos += hlsCert.size() + 1;
+        data[8] |= (1 << 2);
+    }
+
+    if (mask->rtmpKey && (bufferSize > pos + rtmpKey.size() + 1))
+    {
+        memcpy(&data[pos], rtmpKey.c_str(), rtmpKey.size() + 1);
+        pos += rtmpKey.size() + 1;
+        data[8] |= (1 << 1);
+    }
+
+    if (mask->rtmpCert && (bufferSize > pos + rtmpCert.size() + 1))
+    {
+        memcpy(&data[pos], rtmpCert.c_str(), rtmpCert.size() + 1);
+        pos += rtmpCert.size() + 1;
+        data[8] |= (1 << 0);
+    }
+
+    if (mask->rtspEncryption && (bufferSize > pos + rtspEncryption.size() + 1))
+    {
+        memcpy(&data[pos], rtspEncryption.c_str(), rtspEncryption.size() + 1);
+        pos += rtspEncryption.size() + 1;
+        data[9] |= (1 << 7);
+    }
+
+    if (mask->webRtcEncryption && (bufferSize > pos + webRtcEncryption.size() + 1))
+    {
+        memcpy(&data[pos], webRtcEncryption.c_str(), webRtcEncryption.size() + 1);
+        pos += webRtcEncryption.size() + 1;
+        data[9] |= (1 << 6);
+    }
+
+    if (mask->rtmpEncryption && (bufferSize > pos + rtmpEncryption.size() + 1))
+    {
+        memcpy(&data[pos], rtmpEncryption.c_str(), rtmpEncryption.size() + 1);
+        pos += rtmpEncryption.size() + 1;
+        data[9] |= (1 << 5);
+    }
+
+    if (mask->hlsEncryption && (bufferSize > pos + hlsEncryption.size() + 1))
+    {
+        memcpy(&data[pos], hlsEncryption.c_str(), hlsEncryption.size() + 1);
+        pos += hlsEncryption.size() + 1;
+        data[9] |= (1 << 4);
     }
 
     size = pos;
@@ -536,19 +428,10 @@ bool VStreamerParams::encode(uint8_t *data, int bufferSize, int &size, VStreamer
 
 
 
-bool VStreamerParams::decode(uint8_t *data, int dataSize)
+bool VStreamerParams::deserialize(uint8_t *data, int dataSize)
 {
-
-    /*
-        0 = header with value 0x02
-        1 and 2 = versions
-        3, 4, 5 and 6 = Masks
-        7 = int size from source system in terms bytes
-        8 = start of actual data.
-    */
-
     // Check data size.
-    if (dataSize < 8)
+    if (dataSize < 11)
         return false;
 
     // Check header.
@@ -556,16 +439,14 @@ bool VStreamerParams::decode(uint8_t *data, int dataSize)
         return false;
 
     // Decode version.
-    if (data[1] != VSTREAMER_MAJOR_VERSION)
-        return false;
-    if (data[2] != VSTREAMER_MINOR_VERSION)
+    if (data[1] != VSTREAMER_MAJOR_VERSION || data[2] != VSTREAMER_MINOR_VERSION)
         return false;
 
-    // get int size from source system.
-    int sizeInt = data[7];
+    // Array for string conversion.
+    char strArray[512];
 
-    // start of actual data.
-    int pos = 8;
+    // Start of actual data.
+    int pos = 10;
 
     if (checkBit(data[3], 7))
     {
@@ -581,10 +462,10 @@ bool VStreamerParams::decode(uint8_t *data, int dataSize)
 
     if (checkBit(data[3], 6))
     {
-        if (dataSize < pos + sizeInt)
+        if (dataSize < pos + sizeof(int))
             return false;
-        memcpy(&width, &data[pos], sizeInt);
-        pos += sizeInt;
+        memcpy(&width, &data[pos], sizeof(int));
+        pos += sizeof(int);
     }
     else
     {
@@ -593,10 +474,10 @@ bool VStreamerParams::decode(uint8_t *data, int dataSize)
 
     if (checkBit(data[3], 5))
     {
-        if (dataSize < pos + sizeInt)
+        if (dataSize < pos + sizeof(int))
             return false;
-        memcpy(&height, &data[pos], sizeInt);
-        pos += sizeInt;
+        memcpy(&height, &data[pos], sizeof(int));
+        pos += sizeof(int);
     }
     else
     {
@@ -605,11 +486,10 @@ bool VStreamerParams::decode(uint8_t *data, int dataSize)
 
     if (checkBit(data[3], 4))
     {
-        char *tempVal = new char[50]; // 50 is enough big for any array.
-        strcpy(tempVal, (char *)&data[pos]);
-        pos += strlen(tempVal) + 1;
-        ip = tempVal;
-        delete[] tempVal;
+        memset(strArray, 0, 512);
+        strcpy(strArray, (char *)&data[pos]);
+        pos += strlen(strArray) + 1;
+        ip = strArray;
     }
     else
     {
@@ -618,281 +498,579 @@ bool VStreamerParams::decode(uint8_t *data, int dataSize)
 
     if (checkBit(data[3], 3))
     {
-        if (dataSize < pos + sizeInt)
+        if (dataSize < pos + sizeof(int))
             return false;
-        memcpy(&port, &data[pos], sizeInt);
-        pos += sizeInt;
+        memcpy(&rtspPort, &data[pos], sizeof(int));
+        pos += sizeof(int);
     }
     else
     {
-        port = 0;
+        rtspPort = 0;
     }
 
     if (checkBit(data[3], 2))
     {
-        char *tempVal = new char[50]; // 50 is enough big for any array.
-        strcpy(tempVal, (char *)&data[pos]);
-        pos += strlen(tempVal) + 1;
-        user = tempVal;
-        delete[] tempVal;
+        if (dataSize < pos + sizeof(int))
+            return false;
+        memcpy(&rtpPort, &data[pos], sizeof(int));
+        pos += sizeof(int);
+    }
+    else
+    {
+        rtpPort = 0;
+    }
+
+    if (checkBit(data[3], 1))
+    {
+        if (dataSize < pos + sizeof(int))
+            return false;
+        memcpy(&webRtcPort, &data[pos], sizeof(int));
+        pos += sizeof(int);
+    }
+    else
+    {
+        webRtcPort = 0;
+    }
+
+    if (checkBit(data[3], 0))
+    {
+        if (dataSize < pos + sizeof(int))
+            return false;
+        memcpy(&hlsPort, &data[pos], sizeof(int));
+        pos += sizeof(int);
+    }
+    else
+    {
+        hlsPort = 0;
+    }
+
+    if (checkBit(data[4], 7))
+    {
+        if (dataSize < pos + sizeof(int))
+            return false;
+        memcpy(&srtPort, &data[pos], sizeof(int));
+        pos += sizeof(int);
+    }
+    else
+    {
+        srtPort = 0;
+    }
+
+    if (checkBit(data[4], 6))
+    {
+        if (dataSize < pos + sizeof(int))
+            return false;
+        memcpy(&rtmpPort, &data[pos], sizeof(int));
+        pos += sizeof(int);
+    }
+    else
+    {
+        rtmpPort = 0;
+    }
+
+    if (checkBit(data[4], 5))
+    {
+        if (dataSize < pos + sizeof(int))
+            return false;
+        memcpy(&metadataPort, &data[pos], sizeof(int));
+        pos += sizeof(int);
+    }
+    else
+    {
+        metadataPort = 0;
+    }
+
+    if (checkBit(data[4], 4))
+    {
+        if (dataSize < pos + 1)
+            return false;
+        memcpy(&rtspEnable, &data[pos], sizeof(bool));
+        pos += sizeof(bool);
+    }
+    else
+    {
+        rtspEnable = false;
+    }
+
+    if (checkBit(data[4], 3))
+    {
+        if (dataSize < pos + 1)
+            return false;
+        memcpy(&rtpEnable, &data[pos], sizeof(bool));
+        pos += sizeof(bool);
+    }
+    else
+    {
+        rtpEnable = false;
+    }
+
+    if (checkBit(data[4], 2))
+    {
+        if (dataSize < pos + 1)
+            return false;
+        memcpy(&webRtcEnable, &data[pos], sizeof(bool));
+        pos += sizeof(bool);
+    }
+    else
+    {
+        webRtcEnable = false;
+    }
+
+    if (checkBit(data[4], 1))
+    {
+        if (dataSize < pos + 1)
+            return false;
+        memcpy(&hlsEnable, &data[pos], sizeof(bool));
+        pos += sizeof(bool);
+    }
+    else
+    {
+        hlsEnable = false;
+    }
+
+    if (checkBit(data[4], 0))
+    {
+        if (dataSize < pos + 1)
+            return false;
+        memcpy(&srtEnable, &data[pos], sizeof(bool));
+        pos += sizeof(bool);
+    }
+    else
+    {
+        srtEnable = false;
+    }
+
+    if (checkBit(data[5], 7))
+    {
+        if (dataSize < pos + 1)
+            return false;
+        memcpy(&rtmpEnable, &data[pos], sizeof(bool));
+        pos += sizeof(bool);
+    }
+    else
+    {
+        rtmpEnable = false;
+    }
+
+    if (checkBit(data[5], 6))
+    {
+        if (dataSize < pos + 1)
+            return false;
+        memcpy(&metadataEnable, &data[pos], sizeof(bool));
+        pos += sizeof(bool);
+    }
+    else
+    {
+        metadataEnable = false;
+    }
+
+    if (checkBit(data[5], 5))
+    {
+        memset(strArray, 0, 512);
+        strcpy(strArray, (char *)&data[pos]);
+        pos += strlen(strArray) + 1;
+        rtspMulticastIp = strArray;
+    }
+    else
+    {
+        rtspMulticastIp = "";
+    }
+
+    if (checkBit(data[5], 4))
+    {
+        if (dataSize < pos + sizeof(int))
+            return false;
+        memcpy(&rtspMulticastPort, &data[pos], sizeof(int));
+        pos += sizeof(int);
+    }
+    else
+    {
+        rtspMulticastPort = 0;
+    }
+
+    if (checkBit(data[5], 3))
+    {
+        memset(strArray, 0, 512);
+        strcpy(strArray, (char *)&data[pos]);
+        pos += strlen(strArray) + 1;
+        user = strArray;
     }
     else
     {
         user = "";
     }
 
-    if (checkBit(data[3], 1))
+    if (checkBit(data[5], 2))
     {
-        char *tempVal = new char[50]; // 50 is enough big for any array.
-        strcpy(tempVal, (char *)&data[pos]);
-        pos += strlen(tempVal) + 1;
-        suffix = tempVal;
-        delete[] tempVal;
-    }
-    else
-    {
-        suffix = "";
-    }
-
-    if (checkBit(data[3], 0))
-    {
-        if (dataSize < pos + sizeInt)
-            return false;
-        memcpy(&minBitrateKbps, &data[pos], sizeInt);
-        pos += sizeInt;
-    }
-    else
-    {
-        minBitrateKbps = 0;
-    }
-
-    if (checkBit(data[4], 7))
-    {
-        if (dataSize < pos + sizeInt)
-            return false;
-        memcpy(&maxBitrateKbps, &data[pos], sizeInt);
-        pos += sizeInt;
-    }
-    else
-    {
-        maxBitrateKbps = 0;
-    }
-
-    if (checkBit(data[4], 6))
-    {
-        if (dataSize < pos + sizeInt)
-            return false;
-        memcpy(&bitrateKbps, &data[pos], sizeInt);
-        pos += sizeInt;
-    }
-    else
-    {
-        bitrateKbps = 0;
-    }
-
-    if (checkBit(data[4], 5))
-    {
-        if (dataSize < pos + sizeInt)
-            return false;
-        memcpy(&bitrateMode, &data[pos], sizeInt);
-        pos += sizeInt;
-    }
-    else
-    {
-        bitrateMode = 0.0f;
-    }
-
-    if (checkBit(data[4], 4))
-    {
-        if (dataSize < pos + sizeInt)
-            return false;
-        int tempFps;
-        memcpy(&tempFps, &data[pos], sizeInt);
-        pos += sizeInt;
-        fps = tempFps;
-    }
-    else
-    {
-        fps = 0;
-    }
-
-    if (checkBit(data[4], 3))
-    {
-        if (dataSize < pos + sizeInt)
-            return false;
-        memcpy(&gop, &data[pos], sizeInt);
-        pos += sizeInt;
-    }
-    else
-    {
-        gop = 0;
-    }
-
-    if (checkBit(data[4], 2))
-    {
-        if (dataSize < pos + sizeInt)
-            return false;
-        memcpy(&h264Profile, &data[pos], sizeInt);
-        pos += sizeInt;
-    }
-    else
-    {
-        h264Profile = -1;
-    }
-
-    if (checkBit(data[4], 1))
-    {
-        if (dataSize < pos + sizeInt)
-            return false;
-        memcpy(&jpegQuality, &data[pos], sizeInt);
-        pos += sizeInt;
-    }
-    else
-    {
-        jpegQuality = 0;
-    }
-
-    if (checkBit(data[5], 7))
-    {
-        char *tempVal = new char[50]; // 50 is enough big for any array.
-        strcpy(tempVal, (char *)&data[pos]);
-        pos += strlen(tempVal) + 1;
-        codec = tempVal;
-        delete[] tempVal;
-    }
-    else
-    {
-        codec = "";
-    }
-
-    if (checkBit(data[5], 6))
-    {
-        if (dataSize < pos + sizeInt)
-            return false;
-        memcpy(&fitMode, &data[pos], sizeInt);
-        pos += sizeInt;
-    }
-    else
-    {
-        fitMode = -1;
-    }
-
-    if (checkBit(data[5], 5))
-    {
-        if (dataSize < pos + sizeInt)
-            return false;
-        memcpy(&cycleTimeMksec, &data[pos], sizeInt);
-        pos += sizeInt;
-    }
-    else
-    {
-        cycleTimeMksec = -1;
-    }
-
-    if (checkBit(data[5], 4))
-    {
-        char *tempVal = new char[50]; // 50 is enough big for any array.
-        strcpy(tempVal, (char *)&data[pos]);
-        pos += strlen(tempVal) + 1;
-        password = tempVal;
-        delete[] tempVal;
+        memset(strArray, 0, 512);
+        strcpy(strArray, (char *)&data[pos]);
+        pos += strlen(strArray) + 1;
+        password = strArray;
     }
     else
     {
         password = "";
     }
 
-    if (checkBit(data[5], 3))
-    {
-        if (dataSize < pos + 1)
-            return false;
-        memcpy(&overlayMode, &data[pos], sizeof(bool));
-        pos += sizeof(bool);
-    }
-    else
-    {
-        overlayMode = false;
-    }
-
-    if (checkBit(data[5], 2))
-    {
-        if (dataSize < pos + sizeInt)
-            return false;
-        memcpy(&type, &data[pos], sizeInt);
-        pos += sizeInt;
-    }
-    else
-    {
-        type = -1;
-    }
-
     if (checkBit(data[5], 1))
     {
-        if (dataSize < pos + sizeInt)
-            return false;
-        int tempCustom1;
-        memcpy(&tempCustom1, &data[pos], sizeInt);
-        pos += sizeInt;
-        custom1 = tempCustom1;
+        memset(strArray, 0, 512);
+        strcpy(strArray, (char *)&data[pos]);
+        pos += strlen(strArray) + 1;
+        suffix = strArray;
     }
     else
     {
-        custom1 = -1;
+        suffix = "";
     }
 
     if (checkBit(data[5], 0))
     {
-        if (dataSize < pos + sizeInt)
-            return false;
-        int tempCustom2;
-        memcpy(&tempCustom2, &data[pos], sizeInt);
-        pos += sizeInt;
-        custom2 = tempCustom2;
+        memset(strArray, 0, 512);
+        strcpy(strArray, (char *)&data[pos]);
+        pos += strlen(strArray) + 1;
+        metadataSuffix = strArray;
     }
     else
     {
-        custom2 = -1;
+        metadataSuffix = "";
     }
 
     if (checkBit(data[6], 7))
     {
-        if (dataSize < pos + sizeInt)
+        if (dataSize < pos + sizeof(int))
             return false;
-        int tempCustom3;
-        memcpy(&tempCustom3, &data[pos], sizeInt);
-        pos += sizeInt;
-        custom3 = tempCustom3;
+        memcpy(&minBitrateKbps, &data[pos], sizeof(int));
+        pos += sizeof(int);
     }
     else
     {
-        custom3 = -1;
+        minBitrateKbps = 0;
     }
 
     if (checkBit(data[6], 6))
     {
-        char *tempVal = new char[50]; // 50 is enough big for any array.
-        strcpy(tempVal, (char *)&data[pos]);
-        pos += strlen(tempVal) + 1;
-        multicastIp = tempVal;
-        delete[] tempVal;
+        if (dataSize < pos + sizeof(int))
+            return false;
+        memcpy(&maxBitrateKbps, &data[pos], sizeof(int));
+        pos += sizeof(int);
     }
     else
     {
-        multicastIp = "";
+        maxBitrateKbps = 0;
     }
 
     if (checkBit(data[6], 5))
     {
-        if (dataSize < pos + sizeInt)
+        if (dataSize < pos + sizeof(int))
             return false;
-        memcpy(&multicastPort, &data[pos], sizeInt);
-        pos += sizeInt;
+        memcpy(&bitrateKbps, &data[pos], sizeof(int));
+        pos += sizeof(int);
     }
     else
     {
-        multicastPort = 0;
+        bitrateKbps = 0;
     }
 
+    if (checkBit(data[6], 4))
+    {
+        if (dataSize < pos + sizeof(int))
+            return false;
+        memcpy(&bitrateMode, &data[pos], sizeof(int));
+        pos += sizeof(int);
+    }
+    else
+    {
+        bitrateMode = 0;
+    }
+
+    if (checkBit(data[6], 3))
+    {
+        if (dataSize < pos + sizeof(float))
+            return false;
+        memcpy(&fps, &data[pos], sizeof(float));
+        pos += sizeof(float);
+    }
+    else
+    {
+        fps = 0;
+    }
+
+    if (checkBit(data[6], 2))
+    {
+        if (dataSize < pos + sizeof(int))
+            return false;
+        memcpy(&gop, &data[pos], sizeof(int));
+        pos += sizeof(int);
+    }
+    else
+    {
+        gop = 0;
+    }
+
+    if (checkBit(data[6], 1))
+    {
+        if (dataSize < pos + sizeof(int))
+            return false;
+        memcpy(&h264Profile, &data[pos], sizeof(int));
+        pos += sizeof(int);
+    }
+    else
+    {
+        h264Profile = 0;
+    }
+
+    if (checkBit(data[6], 0))
+    {
+        if (dataSize < pos + sizeof(int))
+            return false;
+        memcpy(&jpegQuality, &data[pos], sizeof(int));
+        pos += sizeof(int);
+    }
+    else
+    {
+        jpegQuality = 0;
+    }
+
+    if (checkBit(data[7], 7))
+    {
+        memset(strArray, 0, 512);
+        strcpy(strArray, (char *)&data[pos]);
+        pos += strlen(strArray) + 1;
+        codec = strArray;
+    }
+    else
+    {
+        codec = "";
+    }
+
+    if (checkBit(data[7], 6))
+    {
+        if (dataSize < pos + sizeof(int))
+            return false;
+        memcpy(&fitMode, &data[pos], sizeof(int));
+        pos += sizeof(int);
+    }
+    else
+    {
+        fitMode = 0;
+    }
+
+    if (checkBit(data[7], 5))
+    {
+        if (dataSize < pos + sizeof(int))
+            return false;
+        memcpy(&cycleTimeUs, &data[pos], sizeof(int));
+        pos += sizeof(int);
+    }
+    else
+    {
+        cycleTimeUs = 0;
+    }
+
+    if (checkBit(data[7], 4))
+    {
+        if (dataSize < pos + 1)
+            return false;
+        memcpy(&overlayEnable, &data[pos], sizeof(bool));
+        pos += sizeof(bool);
+    }
+    else
+    {
+        overlayEnable = false;
+    }
+
+    if (checkBit(data[7], 3))
+    {
+        if (dataSize < pos + sizeof(int))
+            return false;
+        memcpy(&type, &data[pos], sizeof(int));
+        pos += sizeof(int);
+    }
+    else
+    {
+        type = 0;
+    }
+
+    if (checkBit(data[7], 2))
+    {
+        if (dataSize < pos + sizeof(float))
+            return false;
+        memcpy(&custom1, &data[pos], sizeof(float));
+        pos += sizeof(float);
+    }
+    else
+    {
+        custom1 = 0;
+    }
+
+    if (checkBit(data[7], 1))
+    {
+        if (dataSize < pos + sizeof(float))
+            return false;
+        memcpy(&custom2, &data[pos], sizeof(float));
+        pos += sizeof(float);
+    }
+    else
+    {
+        custom2 = 0;
+    }
+
+    if (checkBit(data[7], 0))
+    {
+        if (dataSize < pos + sizeof(float))
+            return false;
+        memcpy(&custom3, &data[pos], sizeof(float));
+        pos += sizeof(float);
+    }
+    else
+    {
+        custom3 = 0;
+    }
+
+    if (checkBit(data[8], 7))
+    {
+        memset(strArray, 0, 512);
+        strcpy(strArray, (char *)&data[pos]);
+        pos += strlen(strArray) + 1;
+        rtspKey = strArray;
+    }
+    else
+    {
+        rtspKey = "";
+    }
+
+    if (checkBit(data[8], 6))
+    {
+        memset(strArray, 0, 512);
+        strcpy(strArray, (char *)&data[pos]);
+        pos += strlen(strArray) + 1;
+        rtspCert = strArray;
+    }
+    else
+    {
+        rtspCert = "";
+    }
+
+    if (checkBit(data[8], 5))
+    {
+        memset(strArray, 0, 512);
+        strcpy(strArray, (char *)&data[pos]);
+        pos += strlen(strArray) + 1;
+        webRtcKey = strArray;
+    }
+    else
+    {
+        webRtcKey = "";
+    }
+
+    if (checkBit(data[8], 4))
+    {
+        memset(strArray, 0, 512);
+        strcpy(strArray, (char *)&data[pos]);
+        pos += strlen(strArray) + 1;
+        webRtcCert = strArray;
+    }
+    else
+    {
+        webRtcCert = "";
+    }
+
+    if (checkBit(data[8], 3))
+    {
+        memset(strArray, 0, 512);
+        strcpy(strArray, (char *)&data[pos]);
+        pos += strlen(strArray) + 1;
+        hlsKey = strArray;
+    }
+    else
+    {
+        hlsKey = "";
+    }
+
+    if (checkBit(data[8], 2))
+    {
+        memset(strArray, 0, 512);
+        strcpy(strArray, (char *)&data[pos]);
+        pos += strlen(strArray) + 1;
+        hlsCert = strArray;
+    }
+    else
+    {
+        hlsCert = "";
+    }
+
+    if (checkBit(data[8], 1))
+    {
+        memset(strArray, 0, 512);
+        strcpy(strArray, (char *)&data[pos]);
+        pos += strlen(strArray) + 1;
+        rtmpKey = strArray;
+    }
+    else
+    {
+        rtmpKey = "";
+    }
+
+    if (checkBit(data[8], 0))
+    {
+        memset(strArray, 0, 512);
+        strcpy(strArray, (char *)&data[pos]);
+        pos += strlen(strArray) + 1;
+        rtmpCert = strArray;
+    }
+    else
+    {
+        rtmpCert = "";
+    }
+
+    if (checkBit(data[9], 7))
+    {
+        memset(strArray, 0, 512);
+        strcpy(strArray, (char *)&data[pos]);
+        pos += strlen(strArray) + 1;
+        rtspEncryption = strArray;
+    }
+    else
+    {
+        rtspEncryption = "";
+    }
+
+    if (checkBit(data[9], 6))
+    {
+        memset(strArray, 0, 512);
+        strcpy(strArray, (char *)&data[pos]);
+        pos += strlen(strArray) + 1;
+        webRtcEncryption = strArray;
+    }
+    else
+    {
+        webRtcEncryption = "";
+    }
+
+    if (checkBit(data[9], 5))
+    {
+        memset(strArray, 0, 512);
+        strcpy(strArray, (char *)&data[pos]);
+        pos += strlen(strArray) + 1;
+        rtmpEncryption = strArray;
+    }
+    else
+    {
+        rtmpEncryption = "";
+    }
+
+    if (checkBit(data[9], 4))
+    {
+        memset(strArray, 0, 512);
+        strcpy(strArray, (char *)&data[pos]);
+        pos += strlen(strArray) + 1;
+        hlsEncryption = strArray;
+    }
+    else
+    {
+        hlsEncryption = "";
+    }
 
     return true;
 }
@@ -916,7 +1094,7 @@ void VStreamer::encodeSetParamCommand(
 
 
 
-void encodeSetParamCommand(
+void cr::video::VStreamer::encodeSetParamCommand(
     uint8_t* data, int& size, VStreamerParam id, std::string value)
 {
     // Fill header.
@@ -981,7 +1159,7 @@ int cr::video::VStreamer::decodeCommand(uint8_t *data,
     {
         // Check size.
         if (size != 11)
-            return false;
+            return -1;
 
         paramId = (VStreamerParam)id;
         memcpy(&value, &data[7], 4);
@@ -989,13 +1167,19 @@ int cr::video::VStreamer::decodeCommand(uint8_t *data,
     }
     else if(data[0] == 0x02)
     {
-        // We can't check size here because we don't know the size of string.
+        // Check minimum size for string command.
+        if (size < 8)
+            return -1;
 
         paramId = (VStreamerParam)id;
 
-        char *tempVal = new char[50]; // 50 is enough big for any array.
-        strcpy(tempVal, (char *)&data[7]);
-        strValue = std::string(tempVal);
+        // Safe string copying with bounds checking
+        int maxLen = size - 7;  // Remaining buffer size after header and parameter ID
+        char tempBuffer[512];   // Temporary buffer for safety
+        int copyLen = (maxLen < 511) ? maxLen : 511;
+        memcpy(tempBuffer, &data[7], copyLen);
+        tempBuffer[copyLen] = '\0';  // Ensure null termination
+        strValue = std::string(tempBuffer);
         return 2;
     }
 
@@ -1007,19 +1191,19 @@ int cr::video::VStreamer::decodeCommand(uint8_t *data,
 bool cr::video::VStreamer::decodeAndExecuteCommand(uint8_t* data, int size)
 {
     // Decode command.
-    VStreamerCommand commandId = VStreamerCommand::RESTART; // any value.
-    VStreamerParam paramId = VStreamerParam::FIT_MODE; // any value.
+    VStreamerCommand commandId = VStreamerCommand::RESTART; // Default value.
+    VStreamerParam paramId = VStreamerParam::FIT_MODE; // Default value.
     float value = 0.0f;
     std::string strValue = "";
     switch (VStreamer::decodeCommand(data, size, paramId, commandId, value, strValue))
     {
-    // COMMAND.
+    // Command.
     case 0:
         return executeCommand(commandId);
-    // SET_PARAM.
+    // Set parameter.
     case 1:
         return setParam(paramId, value);
-    // SET_PARAM_STR.
+    // Set parameter string.
     case 2:
         return setParam(paramId, strValue);
     default:
