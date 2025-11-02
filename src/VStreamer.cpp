@@ -31,7 +31,7 @@ string VStreamer::getVersion()
 bool VStreamerParams::serialize(uint8_t *data, int bufferSize, int &size, VStreamerParamsMask *mask)
 {
     // Check buffer size.
-    if (bufferSize < 9) // Header + one bool parameter.
+    if (bufferSize < 11) // Header + one bool parameter.
     {
         size = 0;
         return false;
@@ -46,6 +46,8 @@ bool VStreamerParams::serialize(uint8_t *data, int bufferSize, int &size, VStrea
     data[5] = 0; // Parameter mask byte 3
     data[6] = 0; // Parameter mask byte 4
     data[7] = 0; // Parameter mask byte 5
+    data[8] = 0; // Parameter mask byte 6
+    data[9] = 0; // Parameter mask byte 7
 
     // If mask is not initialized then encode all parameters.
     VStreamerParamsMask defaultMask;
@@ -53,7 +55,7 @@ bool VStreamerParams::serialize(uint8_t *data, int bufferSize, int &size, VStrea
         mask = &defaultMask;
     
     // Fill data.
-    int pos = 8;
+    int pos = 10;
 
     if (mask->enable && (bufferSize > pos + sizeof(bool)))
     {
@@ -335,6 +337,90 @@ bool VStreamerParams::serialize(uint8_t *data, int bufferSize, int &size, VStrea
         data[7] |= (1 << 0);
     }
 
+    if (mask->rtspKey && (bufferSize > pos + rtspKey.size() + 1))
+    {
+        memcpy(&data[pos], rtspKey.c_str(), rtspKey.size() + 1);
+        pos += rtspKey.size() + 1;
+        data[8] |= (1 << 7);
+    }
+
+    if (mask->rtspCert && (bufferSize > pos + rtspCert.size() + 1))
+    {
+        memcpy(&data[pos], rtspCert.c_str(), rtspCert.size() + 1);
+        pos += rtspCert.size() + 1;
+        data[8] |= (1 << 6);
+    }
+
+    if (mask->webRtcKey && (bufferSize > pos + webRtcKey.size() + 1))
+    {
+        memcpy(&data[pos], webRtcKey.c_str(), webRtcKey.size() + 1);
+        pos += webRtcKey.size() + 1;
+        data[8] |= (1 << 5);
+    }
+
+    if (mask->webRtcCert && (bufferSize > pos + webRtcCert.size() + 1))
+    {
+        memcpy(&data[pos], webRtcCert.c_str(), webRtcCert.size() + 1);
+        pos += webRtcCert.size() + 1;
+        data[8] |= (1 << 4);
+    }
+
+    if (mask->hlsKey && (bufferSize > pos + hlsKey.size() + 1))
+    {
+        memcpy(&data[pos], hlsKey.c_str(), hlsKey.size() + 1);
+        pos += hlsKey.size() + 1;
+        data[8] |= (1 << 3);
+    }
+
+    if (mask->hlsCert && (bufferSize > pos + hlsCert.size() + 1))
+    {
+        memcpy(&data[pos], hlsCert.c_str(), hlsCert.size() + 1);
+        pos += hlsCert.size() + 1;
+        data[8] |= (1 << 2);
+    }
+
+    if (mask->rtmpKey && (bufferSize > pos + rtmpKey.size() + 1))
+    {
+        memcpy(&data[pos], rtmpKey.c_str(), rtmpKey.size() + 1);
+        pos += rtmpKey.size() + 1;
+        data[8] |= (1 << 1);
+    }
+
+    if (mask->rtmpCert && (bufferSize > pos + rtmpCert.size() + 1))
+    {
+        memcpy(&data[pos], rtmpCert.c_str(), rtmpCert.size() + 1);
+        pos += rtmpCert.size() + 1;
+        data[8] |= (1 << 0);
+    }
+
+    if (mask->rtspEncryption && (bufferSize > pos + rtspEncryption.size() + 1))
+    {
+        memcpy(&data[pos], rtspEncryption.c_str(), rtspEncryption.size() + 1);
+        pos += rtspEncryption.size() + 1;
+        data[9] |= (1 << 7);
+    }
+
+    if (mask->webRtcEncryption && (bufferSize > pos + webRtcEncryption.size() + 1))
+    {
+        memcpy(&data[pos], webRtcEncryption.c_str(), webRtcEncryption.size() + 1);
+        pos += webRtcEncryption.size() + 1;
+        data[9] |= (1 << 6);
+    }
+
+    if (mask->rtmpEncryption && (bufferSize > pos + rtmpEncryption.size() + 1))
+    {
+        memcpy(&data[pos], rtmpEncryption.c_str(), rtmpEncryption.size() + 1);
+        pos += rtmpEncryption.size() + 1;
+        data[9] |= (1 << 5);
+    }
+
+    if (mask->hlsEncryption && (bufferSize > pos + hlsEncryption.size() + 1))
+    {
+        memcpy(&data[pos], hlsEncryption.c_str(), hlsEncryption.size() + 1);
+        pos += hlsEncryption.size() + 1;
+        data[9] |= (1 << 4);
+    }
+
     size = pos;
 
     return true;
@@ -345,7 +431,7 @@ bool VStreamerParams::serialize(uint8_t *data, int bufferSize, int &size, VStrea
 bool VStreamerParams::deserialize(uint8_t *data, int dataSize)
 {
     // Check data size.
-    if (dataSize < 9)
+    if (dataSize < 11)
         return false;
 
     // Check header.
@@ -360,7 +446,7 @@ bool VStreamerParams::deserialize(uint8_t *data, int dataSize)
     char strArray[512];
 
     // Start of actual data.
-    int pos = 8;
+    int pos = 10;
 
     if (checkBit(data[3], 7))
     {
@@ -840,6 +926,150 @@ bool VStreamerParams::deserialize(uint8_t *data, int dataSize)
     else
     {
         custom3 = 0;
+    }
+
+    if (checkBit(data[8], 7))
+    {
+        memset(strArray, 0, 512);
+        strcpy(strArray, (char *)&data[pos]);
+        pos += strlen(strArray) + 1;
+        rtspKey = strArray;
+    }
+    else
+    {
+        rtspKey = "";
+    }
+
+    if (checkBit(data[8], 6))
+    {
+        memset(strArray, 0, 512);
+        strcpy(strArray, (char *)&data[pos]);
+        pos += strlen(strArray) + 1;
+        rtspCert = strArray;
+    }
+    else
+    {
+        rtspCert = "";
+    }
+
+    if (checkBit(data[8], 5))
+    {
+        memset(strArray, 0, 512);
+        strcpy(strArray, (char *)&data[pos]);
+        pos += strlen(strArray) + 1;
+        webRtcKey = strArray;
+    }
+    else
+    {
+        webRtcKey = "";
+    }
+
+    if (checkBit(data[8], 4))
+    {
+        memset(strArray, 0, 512);
+        strcpy(strArray, (char *)&data[pos]);
+        pos += strlen(strArray) + 1;
+        webRtcCert = strArray;
+    }
+    else
+    {
+        webRtcCert = "";
+    }
+
+    if (checkBit(data[8], 3))
+    {
+        memset(strArray, 0, 512);
+        strcpy(strArray, (char *)&data[pos]);
+        pos += strlen(strArray) + 1;
+        hlsKey = strArray;
+    }
+    else
+    {
+        hlsKey = "";
+    }
+
+    if (checkBit(data[8], 2))
+    {
+        memset(strArray, 0, 512);
+        strcpy(strArray, (char *)&data[pos]);
+        pos += strlen(strArray) + 1;
+        hlsCert = strArray;
+    }
+    else
+    {
+        hlsCert = "";
+    }
+
+    if (checkBit(data[8], 1))
+    {
+        memset(strArray, 0, 512);
+        strcpy(strArray, (char *)&data[pos]);
+        pos += strlen(strArray) + 1;
+        rtmpKey = strArray;
+    }
+    else
+    {
+        rtmpKey = "";
+    }
+
+    if (checkBit(data[8], 0))
+    {
+        memset(strArray, 0, 512);
+        strcpy(strArray, (char *)&data[pos]);
+        pos += strlen(strArray) + 1;
+        rtmpCert = strArray;
+    }
+    else
+    {
+        rtmpCert = "";
+    }
+
+    if (checkBit(data[9], 7))
+    {
+        memset(strArray, 0, 512);
+        strcpy(strArray, (char *)&data[pos]);
+        pos += strlen(strArray) + 1;
+        rtspEncryption = strArray;
+    }
+    else
+    {
+        rtspEncryption = "";
+    }
+
+    if (checkBit(data[9], 6))
+    {
+        memset(strArray, 0, 512);
+        strcpy(strArray, (char *)&data[pos]);
+        pos += strlen(strArray) + 1;
+        webRtcEncryption = strArray;
+    }
+    else
+    {
+        webRtcEncryption = "";
+    }
+
+    if (checkBit(data[9], 5))
+    {
+        memset(strArray, 0, 512);
+        strcpy(strArray, (char *)&data[pos]);
+        pos += strlen(strArray) + 1;
+        rtmpEncryption = strArray;
+    }
+    else
+    {
+        rtmpEncryption = "";
+    }
+
+    if (checkBit(data[9], 4))
+    {
+        memset(strArray, 0, 512);
+        strcpy(strArray, (char *)&data[pos]);
+        pos += strlen(strArray) + 1;
+        hlsEncryption = strArray;
+    }
+    else
+    {
+        hlsEncryption = "";
     }
 
     return true;

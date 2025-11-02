@@ -12,7 +12,58 @@ using namespace std;
 // Fill random data.
 void fillRandomData(VStreamerParams &a)
 {
-
+    a.enable = false;
+    a.width = rand() % 65535 + 1;
+    a.height = rand() % 65535 + 1;
+    a.ip = "sfspfo9jbjnbjhklvllks";
+    a.rtspPort = rand() % 65535 + 1;
+    a.rtpPort = rand() % 65535 + 1;
+    a.webRtcPort = rand() % 65535 + 1;
+    a.hlsPort = rand() % 65535 + 1;
+    a.srtPort = rand() % 65535 + 1;
+    a.rtmpPort = rand() % 65535 + 1;
+    a.metadataPort = rand() % 65535 + 1;
+    a.rtspEnable = true;
+    a.rtpEnable = true;
+    a.webRtcEnable = false;
+    a.hlsEnable = false;
+    a.srtEnable = true;
+    a.rtmpEnable = true;
+    a.metadataEnable = false;
+    a.rtspMulticastIp = "wpofuihifo";
+    a.rtspMulticastPort = rand() % 65535 + 1;
+    a.user = "slfljkv";
+    a.password = "sddgoihw,";
+    a.suffix = "pisfhcowmfv";
+    a.metadataSuffix = "z.,nfpowe";
+    a.minBitrateKbps = rand() % 65535 + 1;
+    a.maxBitrateKbps = rand() % 65535 + 1;
+    a.bitrateKbps = rand() % 65535 + 1;
+    a.bitrateMode = rand() % 65535 + 1;
+    a.fps = rand() % 65535 + 1;
+    a.gop = rand() % 65535 + 1;
+    a.h264Profile = rand() % 65535 + 1;
+    a.jpegQuality = rand() % 65535 + 1;
+    a.codec = "dkgvmkrnjv";
+    a.fitMode = rand() % 65535 + 1;
+    a.cycleTimeUs = rand() % 65535 + 1;
+    a.overlayEnable = true;
+    a.type = rand() % 65535 + 1;
+    a.custom1 = rand() % 65535 + 1;
+    a.custom2 = rand() % 65535 + 1;
+    a.custom3 = rand() % 65535 + 1;
+    a.rtspKey = "dh;skcsf";
+    a.rtspCert = "lkjrkjg";
+    a.webRtcKey = "WERUHUHFE";
+    a.webRtcCert = "erghshiAJ";
+    a.hlsKey = "wqlovf;qb";
+    a.hlsCert = "24kjcnnv";
+    a.rtmpKey = "dkkkkjfkjdkjfkj2134";
+    a.rtmpCert = "wfpomv";
+    a.rtspEncryption = "quyen";
+    a.webRtcEncryption = "l;uoykh";
+    a.rtmpEncryption = "skldfjdf";
+    a.hlsEncryption = "wieufjpowkf";
 }
 
 
@@ -291,7 +342,67 @@ bool compareParams(VStreamerParams &a, VStreamerParams &b, VStreamerParamsMask* 
         cout << "custom3" << endl;
         return false;
     }
-
+    if (mask->rtspKey && (a.rtspKey != b.rtspKey))
+    {
+        cout << "rtspKey" << endl;
+        return false;
+    }
+    if (mask->rtspCert && (a.rtspCert != b.rtspCert))
+    {
+        cout << "rtspCert" << endl;
+        return false;
+    }
+    if (mask->webRtcKey && (a.webRtcKey != b.webRtcKey))
+    {
+        cout << "webRtcKey" << endl;
+        return false;
+    }
+    if (mask->webRtcCert && (a.webRtcCert != b.webRtcCert))
+    {
+        cout << "webRtcCert" << endl;
+        return false;
+    }
+    if (mask->hlsKey && (a.hlsKey != b.hlsKey))
+    {
+        cout << "hlsKey" << endl;
+        return false;
+    }
+    if (mask->hlsCert && (a.hlsCert != b.hlsCert))
+    {
+        cout << "hlsCert" << endl;
+        return false;
+    }
+    if (mask->rtmpKey && (a.rtmpKey != b.rtmpKey))
+    {
+        cout << "rtmpKey" << endl;
+        return false;
+    }
+    if (mask->rtmpCert && (a.rtmpCert != b.rtmpCert))
+    {
+        cout << "rtmpCert" << endl;
+        return false;
+    }
+    if (mask->rtspEncryption && (a.rtspEncryption != b.rtspEncryption))
+    {
+        cout << "rtspEncryption" << endl;
+        return false;
+    }
+    if (mask->webRtcEncryption && (a.webRtcEncryption != b.webRtcEncryption))
+    {
+        cout << "webRtcEncryption" << endl;
+        return false;
+    }
+    if (mask->rtmpEncryption && (a.rtmpEncryption != b.rtmpEncryption))
+    {
+        cout << "rtmpEncryption" << endl;
+        return false;
+    }
+    if (mask->hlsEncryption && (a.hlsEncryption != b.hlsEncryption))
+    {
+        cout << "hlsEncryption" << endl;
+        return false;
+    }
+    
     return true;
 }
 
@@ -475,6 +586,18 @@ bool serializeDeserializeWithMaskTest()
     mask.custom1 = true;
     mask.custom2 = false;
     mask.custom3 = true;
+    mask.rtspKey = true;
+    mask.rtspCert = false;
+    mask.webRtcKey = true;
+    mask.webRtcCert = false;
+    mask.hlsKey = true;
+    mask.hlsCert = true;
+    mask.rtmpKey = false;
+    mask.rtmpCert = false;
+    mask.rtspEncryption = false;
+    mask.webRtcEncryption = true;
+    mask.rtmpEncryption = false;
+    mask.hlsEncryption = true;
 
     // Encode data.
     uint8_t data[1024];

@@ -572,6 +572,18 @@ enum class VStreamerParam
 | CUSTOM1          | Custom parameter 1, float. |
 | CUSTOM2          | Custom parameter 2, float. |
 | CUSTOM3          | Custom parameter 3, float. |
+| RTSP_KEY         | Path to openssl key for RTSP, string: **""** or **"no"** - no key. |
+| RTSP_CERT        | Path to openssl certificate for RTSP, string: **""** or **"no"** - no certificate. |
+| WEBRTC_KEY       | Path to openssl key for WebRTC, string: **""** or **"no"** - no key. |
+| WEBRTC_CERT      | Path to openssl certificate for WebRTC, string: **""** or **"no"** - no certificate. |
+| HLS_KEY          | Path to openssl key for HLS, string: **""** or **"no"** - no key. |
+| HLS_CERT         | Path to openssl certificate for HLS, string: **""** or **"no"** - no certificate. |
+| RTMP_KEY         | Path to openssl key for RTMP, string: **""** or **"no"** - no key. |
+| RTMP_CERT        | Path to openssl certificate for RTMP, string: **""** or **"no"** - no certificate. |
+| RTSP_ENCRYPTION  | RTSP encryption type, string: **""** or **"no"**, **"strict"**, **"optional"**. |
+| WEBRTC_ENCRYPTION | WebRTC encryption type, string: **""** or **"no"**, **"yes"**. |
+| RTMP_ENCRYPTION  | RTMP encryption type, string: **""** or **"no"**, **"strict"**, **"optional"**. |
+| HLS_ENCRYPTION   | HLS encryption type, string: **""** or **"no"**, **"yes"**. |
 
 
 
@@ -667,6 +679,30 @@ public:
     float custom2{0.0f};
     /// Custom parameter 3, float.
     float custom3{0.0f};
+    /// Path to openssl key for RTSP, string: "" or "no" - no key.
+    std::string rtspKey{"no"};
+    /// Path to openssl certificate for RTSP, string: "" or "no" - no certificate.
+    std::string rtspCert{"no"};
+    /// Path to openssl key for WebRTC, string: "" or "no" - no key.
+    std::string webRtcKey{"no"};
+    /// Path to openssl certificate for WebRTC, string: "" or "no" - no certificate.
+    std::string webRtcCert{"no"};
+    /// Path to openssl key for HLS, string: "" or "no" - no key.
+    std::string hlsKey{"no"};
+    /// Path to openssl certificate for HLS, string: "" or "no" - no certificate.
+    std::string hlsCert{"no"};
+    /// Path to openssl key for RTMP, string: "" or "no" - no key.
+    std::string rtmpKey{"no"};
+    /// Path to openssl certificate for RTMP, string: "" or "no" - no certificate.
+    std::string rtmpCert{"no"};
+    /// RTSP encryption type, string: "" or "no", "strict", "optional".
+    std::string rtspEncryption{"no"};
+    /// WebRTC encryption type, string: "" or "no", "yes".
+    std::string webRtcEncryption{"no"};
+    /// RTMP encryption type, string: "" or "no", "strict", "optional".
+    std::string rtmpEncryption{"no"};
+    /// HLS encryption type, string: "" or "no", "yes".
+    std::string hlsEncryption{"no"};
 
     JSON_READABLE(VStreamerParams, enable, width, height, ip, rtspPort, rtpPort,
                   webRtcPort, hlsPort, srtPort, rtmpPort, metadataPort,
@@ -675,7 +711,9 @@ public:
                   user, password, suffix, metadataSuffix, minBitrateKbps,
                   maxBitrateKbps, bitrateKbps, bitrateMode, fps, gop, h264Profile,
                   jpegQuality, codec, fitMode, overlayEnable, type, custom1,
-                  custom2, custom3)
+                  custom2, custom3, rtspKey, rtspCert, webRtcKey, webRtcCert,
+                  hlsKey, hlsCert, rtmpKey, rtmpCert, rtspEncryption,
+                  webRtcEncryption, rtmpEncryption, hlsEncryption)
 
     /// Serialize parameters.
     bool serialize(uint8_t* data, int bufferSize, int& size,
@@ -701,35 +739,47 @@ public:
 | srtPort         | Streamer's SRC port, integer [0:65535]. |
 | rtmpPort        | Streamer's RTMP port, integer [0:65535]. |
 | metadataPort    | Streamer's metadata port, integer [0:65535] (for example, for [KLV](https://en.wikipedia.org/wiki/KLV) metadata streaming.). |
-| rtspEnable        | RTSP protocol enable / disable, boolean: **false** - disable, **true** - enable. |
-| rtpEnable         | RTP protocol enable / disable, boolean:**false** - disable, **true** - enable. |
-| webRtcEnable | WebRTC protocol enable / disable, boolean: **false** - disable, **true** - enable. |
-| hlsEnable | HLS protocol enable / disable, boolean: **false** - disable, **true** - enable. |
-| srtEnable | SRT protocol enable / disable, boolean: **false** - disable, **true** - enable. |
-| rtmpEnable | RTMP protocol enable / disable, boolean: **false** - disable, **true** - enable. |
-| metadataEnable | Metadata protocol enable / disable, boolean: **false** - disable, **true** - enable. |
+| rtspEnable      | RTSP protocol enable / disable, boolean: **false** - disable, **true** - enable. |
+| rtpEnable       | RTP protocol enable / disable, boolean:**false** - disable, **true** - enable. |
+| webRtcEnable    | WebRTC protocol enable / disable, boolean: **false** - disable, **true** - enable. |
+| hlsEnable       | HLS protocol enable / disable, boolean: **false** - disable, **true** - enable. |
+| srtEnable       | SRT protocol enable / disable, boolean: **false** - disable, **true** - enable. |
+| rtmpEnable      | RTMP protocol enable / disable, boolean: **false** - disable, **true** - enable. |
+| metadataEnable  | Metadata protocol enable / disable, boolean: **false** - disable, **true** - enable. |
 | rtspMulticastIp | RTSP multicast IP, string. Usually video server accepts range of IPs (default value **224.1.0.1/16**). Some video streamer may support only single IP (example **224.1.0.1/32**). This parameters is used only with IP mask. |
 | rtspMulticastPort | RTSP multicast port, integer [0:65535]. |
-| user | Streamer user (for rtsp streaming), string: "" - no user. |
-| password | Streamer password (for RTSP streaming), string: "" - no password. |
-| suffix | Streamer suffix for RTSP streaming (stream name), string: "" - no suffix. |
-| metadataSuffix | Metadata suffix (stream name), string: "" - no suffix. This parameter is used if the metadata is the separate stream in RTSP. |
-| minBitrateKbps | Minimum bitrate for variable bitrate mode, integer kbps. |
-| maxBitrateKbps | Maximum bitrate for variable bitrate mode, integer kbps. |
-| bitrateKbps | Current bitrate, integer kbps. This parameters is used for constant bitrate mode or as initial value. |
-| bitrateMode | Bitrate mode, integer: 0 - constant bitrate, 1 - variable bitrate. |
-| fps | FPS, float. The input frame FPS can be different from the FPS in the video stream. The video streamer must provide video stream FPS for clients according to this parameter's value independent from input frame FPS ([sendFrame()](#sendframe-method)). If the FPS value is **0**, the streamer must provide FPS equal to the input video frame rate. |
-| gop | Codec GOP size (key frame interval) in case of RAW input video frames. This parameter will be set to the codec provided by the user in the [initVStreamer()](#initvstreamer-method) method. |
-| h264Profile | H264 profile, integer: 0 - baseline, 1 - main, 2 - high. This parameter will be set to the codec provided by the user in the [initVStreamer()](#initvstreamer-method) method. |
-| jpegQuality | JPEG quality, integer: [1:100]% for JPEG codec. This parameter will be set to the codec provided by the user in the [initVStreamer()](#initvstreamer-method) method. |
-| codec | Codec type, string: "H264", "HEVC" or "JPEG". If the user provides already encoded frames in [sendFrame()](#sendframe-method) method. |
-| fitMode | Scaling mode, integer: 0 - fit, 1 - fill. |
-| cycleTimeUs | Cycle time, integer μsec (microseconds). Calculated by video streamer. |
-| overlayEnable | Overlay enable / disable, boolean: **false** - disable, **true** - enable. This parameter enables or disables video overlay if the video overlay module is provided by the user in the [initVStreamer()](#initvstreamer-method) method. |
-| type | Type of the streamer, integer. Depends on implementation. |
-| custom1 | Custom parameter 1, float. |
-| custom2 | Custom parameter 2, float. |
-| custom3 | Custom parameter 3, float. |
+| user            | Streamer user (for rtsp streaming), string: **""** - no user. |
+| password        | Streamer password (for RTSP streaming), string: **""** - no password. |
+| suffix          | Streamer suffix for RTSP streaming (stream name), string: **""** - no suffix. |
+| metadataSuffix  | Metadata suffix (stream name), string: **""** - no suffix. This parameter is used if the metadata is the separate stream in RTSP. |
+| minBitrateKbps  | Minimum bitrate for variable bitrate mode, integer kbps. |
+| maxBitrateKbps  | Maximum bitrate for variable bitrate mode, integer kbps. |
+| bitrateKbps     | Current bitrate, integer kbps. This parameters is used for constant bitrate mode or as initial value. |
+| bitrateMode     | Bitrate mode, integer: 0 - constant bitrate, 1 - variable bitrate. |
+| fps             | FPS, float. The input frame FPS can be different from the FPS in the video stream. The video streamer must provide video stream FPS for clients according to this parameter's value independent from input frame FPS ([sendFrame()](#sendframe-method)). If the FPS value is **0**, the streamer must provide FPS equal to the input video frame rate. |
+| gop             | Codec GOP size (key frame interval) in case of RAW input video frames. This parameter will be set to the codec provided by the user in the [initVStreamer()](#initvstreamer-method) method. |
+| h264Profile     | H264 profile, integer: **0** - baseline, **1** - main, **2** - high. This parameter will be set to the codec provided by the user in the [initVStreamer()](#initvstreamer-method) method. |
+| jpegQuality     | JPEG quality, integer: [1:100]% for JPEG codec. This parameter will be set to the codec provided by the user in the [initVStreamer()](#initvstreamer-method) method. |
+| codec           | Codec type, string: **"H264"**, **"HEVC"** or **"JPEG"**. If the user provides already encoded frames in [sendFrame()](#sendframe-method) method. |
+| fitMode         | Scaling mode, integer: 0 - fit, 1 - fill. |
+| cycleTimeUs     | Cycle time, integer μsec (microseconds). Calculated by video streamer. |
+| overlayEnable   | Overlay enable / disable, boolean: **false** - disable, **true** - enable. This parameter enables or disables video overlay if the video overlay module is provided by the user in the [initVStreamer()](#initvstreamer-method) method. |
+| type            | Type of the streamer, integer. Depends on implementation. |
+| custom1         | Custom parameter 1, float. |
+| custom2         | Custom parameter 2, float. |
+| custom3         | Custom parameter 3, float. |
+| rtspKey         | Path to openssl key for RTSP, string: **""** or **"no"** - no key. |
+| rtspCert        | Path to openssl certificate for RTSP, string: **""** or **"no"** - no certificate. |
+| webRtcKey       | Path to openssl key for WebRTC, string: **""** or **"no"** - no key. |
+| webRtcCert      | Path to openssl certificate for WebRTC, string: **""** or **"no"** - no certificate. |
+| hlsKey          | Path to openssl key for HLS, string: **""** or **"no"** - no key. |
+| hlsCert         | Path to openssl certificate for HLS, string: **""** or **"no"** - no certificate. |
+| rtmpKey         | Path to openssl key for RTMP, string: **""** or **"no"** - no key. |
+| rtmpCert        | Path to openssl certificate for RTMP, string: **""** or **"no"** - no certificate. |
+| rtspEncryption  | RTSP encryption type, string: **""** or **"no"**, **"strict"**, **"optional"**. |
+| webRtcEncryption | WebRTC encryption type, string: **""** or **"no"**, **"yes"**. |
+| rtmpEncryption  | RTMP encryption type, string: **""** or **"no"**, **"strict"**, **"optional"**. |
+| hlsEncryption   | HLS encryption type, string: **""** or **"no"**, **"yes"**. |
 
 
 
@@ -793,6 +843,18 @@ struct VStreamerParamsMask
     bool custom1{true};
     bool custom2{true};
     bool custom3{true};
+    bool rtspKey{true};
+    bool rtspCert{true};
+    bool webRtcKey{true};
+    bool webRtcCert{true};
+    bool hlsKey{true};
+    bool hlsCert{true};
+    bool rtmpKey{true};
+    bool rtmpCert{true};
+    bool rtspEncryption{true};
+    bool webRtcEncryption{true};
+    bool rtmpEncryption{true};
+    bool hlsEncryption{true};
 };
 ```
 
@@ -886,50 +948,62 @@ if(!outConfig.readFromFile("TestVStreamerParams.json"))
 }
 ```
 
-**TestVStreamerParams.json** will look like:
+**TestVStreamerParams.json** will look like (random values):
 
 ```json
 {
     "vStreamerParams": {
-        "bitrateKbps": 3000,
-        "bitrateMode": 0,
-        "codec": "H264",
-        "custom1": 0.0,
-        "custom2": 0.0,
-        "custom3": 0.0,
-        "enable": true,
-        "fitMode": 0,
-        "fps": 30.0,
-        "gop": 30,
-        "h264Profile": 0,
-        "height": 720,
-        "hlsEnable": true,
-        "hlsPort": 8080,
-        "ip": "0.0.0.0",
-        "jpegQuality": 80,
-        "maxBitrateKbps": 5000,
+        "bitrateKbps": 61834,
+        "bitrateMode": 31062,
+        "codec": "dkgvmkrnjv",
+        "custom1": 6818.0,
+        "custom2": 11267.0,
+        "custom3": 45157.0,
+        "enable": false,
+        "fitMode": 56847,
+        "fps": 50955.0,
+        "gop": 9365,
+        "h264Profile": 1963,
+        "height": 34528,
+        "hlsCert": "24kjcnnv",
+        "hlsEnable": false,
+        "hlsEncryption": "wieufjpowkf",
+        "hlsKey": "wqlovf;qb",
+        "hlsPort": 42216,
+        "ip": "sfspfo9jbjnbjhklvllks",
+        "jpegQuality": 55981,
+        "maxBitrateKbps": 42745,
         "metadataEnable": false,
-        "metadataPort": 9000,
-        "metadataSuffix": "metadata",
-        "minBitrateKbps": 1000,
+        "metadataPort": 37042,
+        "metadataSuffix": "z.,nfpowe",
+        "minBitrateKbps": 44304,
         "overlayEnable": true,
-        "password": "",
+        "password": "sddgoihw,",
+        "rtmpCert": "wfpomv",
         "rtmpEnable": true,
-        "rtmpPort": 1935,
+        "rtmpEncryption": "skldfjdf",
+        "rtmpKey": "dkkkkjfkjdkjfkj2134",
+        "rtmpPort": 47479,
         "rtpEnable": true,
-        "rtpPort": 5004,
+        "rtpPort": 43365,
+        "rtspCert": "lkjrkjg",
         "rtspEnable": true,
-        "rtspMulticastIp": "224.1.0.1/16",
-        "rtspMulticastPort": 18000,
-        "rtspPort": 8554,
+        "rtspEncryption": "quyen",
+        "rtspKey": "dh;skcsf",
+        "rtspMulticastIp": "wpofuihifo",
+        "rtspMulticastPort": 48849,
+        "rtspPort": 56910,
         "srtEnable": true,
-        "srtPort": 6000,
-        "suffix": "live",
-        "type": 0,
-        "user": "",
-        "webRtcEnable": true,
-        "webRtcPort": 7000,
-        "width": 1280
+        "srtPort": 12188,
+        "suffix": "pisfhcowmfv",
+        "type": 47135,
+        "user": "slfljkv",
+        "webRtcCert": "erghshiAJ",
+        "webRtcEnable": false,
+        "webRtcEncryption": "l;uoykh",
+        "webRtcKey": "WERUHUHFE",
+        "webRtcPort": 9559,
+        "width": 15780
     }
 }
 ```

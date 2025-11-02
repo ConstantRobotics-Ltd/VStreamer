@@ -56,6 +56,18 @@ struct VStreamerParamsMask
     bool custom1{true};
     bool custom2{true};
     bool custom3{true};
+    bool rtspKey{true};
+    bool rtspCert{true};
+    bool webRtcKey{true};
+    bool webRtcCert{true};
+    bool hlsKey{true};
+    bool hlsCert{true};
+    bool rtmpKey{true};
+    bool rtmpCert{true};
+    bool rtspEncryption{true};
+    bool webRtcEncryption{true};
+    bool rtmpEncryption{true};
+    bool hlsEncryption{true};
 };
 
 /**
@@ -104,10 +116,10 @@ public:
     std::string rtspMulticastIp{"224.1.0.1/16"};
     /// RTSP multicast port, integer [0:65535].
     int rtspMulticastPort{18000};
-    /// Streamer user (for RTSP streaming), string: "" - no user.
-    std::string user{""};
-    /// Streamer password (for RTSP streaming), string: "" - no password.
-    std::string password{""};
+    /// Streamer user (for RTSP streaming), string: "" or "no" - no user.
+    std::string user{"no"};
+    /// Streamer password (for RTSP streaming), string: "" or "no" - no password.
+    std::string password{"no"};
     /// Streamer suffix for RTSP streaming (stream name), string: "" - no suffix.
     std::string suffix{"live"};
     /// Metadata suffix (stream name), string: "" - no suffix.
@@ -144,6 +156,30 @@ public:
     float custom2{0.0f};
     /// Custom parameter 3, float.
     float custom3{0.0f};
+    /// Path to openssl key for RTSP, string: "" or "no" - no key.
+    std::string rtspKey{"no"};
+    /// Path to openssl certificate for RTSP, string: "" or "no" - no certificate.
+    std::string rtspCert{"no"};
+    /// Path to openssl key for WebRTC, string: "" or "no" - no key.
+    std::string webRtcKey{"no"};
+    /// Path to openssl certificate for WebRTC, string: "" or "no" - no certificate.
+    std::string webRtcCert{"no"};
+    /// Path to openssl key for HLS, string: "" or "no" - no key.
+    std::string hlsKey{"no"};
+    /// Path to openssl certificate for HLS, string: "" or "no" - no certificate.
+    std::string hlsCert{"no"};
+    /// Path to openssl key for RTMP, string: "" or "no" - no key.
+    std::string rtmpKey{"no"};
+    /// Path to openssl certificate for RTMP, string: "" or "no" - no certificate.
+    std::string rtmpCert{"no"};
+    /// RTSP encryption type, string: "" or "no", "strict", "optional".
+    std::string rtspEncryption{"no"};
+    /// WebRTC encryption type, string: "" or "no", "yes".
+    std::string webRtcEncryption{"no"};
+    /// RTMP encryption type, string: "" or "no", "strict", "optional".
+    std::string rtmpEncryption{"no"};
+    /// HLS encryption type, string: "" or "no", "yes".
+    std::string hlsEncryption{"no"};
 
     JSON_READABLE(VStreamerParams, enable, width, height, ip, rtspPort, rtpPort,
                   webRtcPort, hlsPort, srtPort, rtmpPort, metadataPort,
@@ -152,7 +188,9 @@ public:
                   user, password, suffix, metadataSuffix, minBitrateKbps,
                   maxBitrateKbps, bitrateKbps, bitrateMode, fps, gop, h264Profile,
                   jpegQuality, codec, fitMode, overlayEnable, type, custom1,
-                  custom2, custom3)
+                  custom2, custom3, rtspKey, rtspCert, webRtcKey, webRtcCert,
+                  hlsKey, hlsCert, rtmpKey, rtmpCert, rtspEncryption,
+                  webRtcEncryption, rtmpEncryption, hlsEncryption)
 
     /**
      * @brief Serialize parameters.
@@ -163,7 +201,7 @@ public:
      * @return TRUE if parameters serialized or FALSE if not.
      */
     bool serialize(uint8_t* data, int bufferSize, int& size,
-                VStreamerParamsMask* mask = nullptr);
+                   VStreamerParamsMask* mask = nullptr);
 
     /**
      * @brief Deserialize parameters.
@@ -260,7 +298,31 @@ enum class VStreamerParam
     /// Custom parameter 2, float.
     CUSTOM2,
     /// Custom parameter 3, float.
-    CUSTOM3
+    CUSTOM3,
+    /// Path to openssl key for RTSP, string.
+    RTSP_KEY,
+    /// Path to openssl certificate for RTSP, string.
+    RTSP_CERT,
+    /// Path to openssl key for WebRTC, string.
+    WEBRTC_KEY,
+    /// Path to openssl certificate for WebRTC, string.
+    WEBRTC_CERT,
+    /// Path to openssl key for HLS, string.
+    HLS_KEY,
+    /// Path to openssl certificate for HLS, string.
+    HLS_CERT,
+    /// Path to openssl key for RTMP, string.
+    RTMP_KEY,
+    /// Path to openssl certificate for RTMP, string.
+    RTMP_CERT,
+    /// RTSP encryption type, string: "no", "strict", "optional".
+    RTSP_ENCRYPTION,
+    /// WebRTC encryption type, string: "no", "yes".
+    WEBRTC_ENCRYPTION,
+    /// RTMP encryption type, string: "no", "strict", "optional".
+    RTMP_ENCRYPTION,
+    /// HLS encryption type, string: "no", "yes".
+    HLS_ENCRYPTION
 };
 
 
