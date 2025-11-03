@@ -68,6 +68,7 @@ struct VStreamerParamsMask
     bool webRtcEncryption{true};
     bool rtmpEncryption{true};
     bool hlsEncryption{true};
+    bool logLevel{true};
 };
 
 /**
@@ -180,6 +181,9 @@ public:
     std::string rtmpEncryption{"no"};
     /// HLS encryption type, string: "" or "no", "yes".
     std::string hlsEncryption{"no"};
+    /// Logging mode. Values: 0 - Disable, 1 - Only file,
+    /// 2 - Only terminal, 3 - File and terminal.
+    int logLevel{0};
 
     JSON_READABLE(VStreamerParams, enable, width, height, ip, rtspPort, rtpPort,
                   webRtcPort, hlsPort, srtPort, rtmpPort, metadataPort,
@@ -190,7 +194,7 @@ public:
                   jpegQuality, codec, fitMode, overlayEnable, type, custom1,
                   custom2, custom3, rtspKey, rtspCert, webRtcKey, webRtcCert,
                   hlsKey, hlsCert, rtmpKey, rtmpCert, rtspEncryption,
-                  webRtcEncryption, rtmpEncryption, hlsEncryption)
+                  webRtcEncryption, rtmpEncryption, hlsEncryption, logLevel)
 
     /**
      * @brief Serialize parameters.
@@ -322,7 +326,10 @@ enum class VStreamerParam
     /// RTMP encryption type, string: "no", "strict", "optional".
     RTMP_ENCRYPTION,
     /// HLS encryption type, string: "no", "yes".
-    HLS_ENCRYPTION
+    HLS_ENCRYPTION,
+    /// Logging mode. Values: 0 - Disable, 1 - Only file,
+    /// 2 - Only terminal, 3 - File and terminal.
+    LOG_LEVEL 
 };
 
 

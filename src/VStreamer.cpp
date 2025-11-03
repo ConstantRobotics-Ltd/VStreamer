@@ -421,6 +421,13 @@ bool VStreamerParams::serialize(uint8_t *data, int bufferSize, int &size, VStrea
         data[9] |= (1 << 4);
     }
 
+    if (mask->logLevel && (bufferSize > pos + sizeof(int)))
+    {
+        memcpy(&data[pos], &logLevel, sizeof(int));
+        pos += sizeof(int);
+        data[9] |= (1 << 3);
+    }
+
     size = pos;
 
     return true;
@@ -1070,6 +1077,18 @@ bool VStreamerParams::deserialize(uint8_t *data, int dataSize)
     else
     {
         hlsEncryption = "";
+    }
+
+    if (checkBit(data[9], 3))
+    {
+        if (dataSize < pos + sizeof(int))
+            return false;
+        memcpy(&logLevel, &data[pos], sizeof(int));
+        pos += sizeof(int);
+    }
+    else
+    {
+        logLevel = 0;
     }
 
     return true;
