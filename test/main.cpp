@@ -64,6 +64,7 @@ void fillRandomData(VStreamerParams &a)
     a.webRtcEncryption = "l;uoykh";
     a.rtmpEncryption = "skldfjdf";
     a.hlsEncryption = "wieufjpowkf";
+    a.logLevel = rand() % 4;
 }
 
 
@@ -131,7 +132,7 @@ int main(void)
         cout << "ERROR" << endl;
     cout << endl;
 
-    return 1;
+    return 0;
 }
 
 
@@ -402,6 +403,11 @@ bool compareParams(VStreamerParams &a, VStreamerParams &b, VStreamerParamsMask* 
         cout << "hlsEncryption" << endl;
         return false;
     }
+    if (mask->logLevel && (a.logLevel != b.logLevel))
+    {
+        cout << "logLevel" << endl;
+        return false;
+    }
     
     return true;
 }
@@ -598,6 +604,7 @@ bool serializeDeserializeWithMaskTest()
     mask.webRtcEncryption = true;
     mask.rtmpEncryption = false;
     mask.hlsEncryption = true;
+    mask.logLevel = true;
 
     // Encode data.
     uint8_t data[1024];
