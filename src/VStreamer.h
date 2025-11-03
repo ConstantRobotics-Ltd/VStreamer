@@ -21,11 +21,13 @@ struct VStreamerParamsMask
     bool height{true};
     bool ip{true};
     bool rtspPort{true};
+    bool rtspsPort{true};
     bool rtpPort{true};
     bool webRtcPort{true};
     bool hlsPort{true};
     bool srtPort{true};
     bool rtmpPort{true};
+    bool rtmpsPort{true};
     bool metadataPort{true};
     bool rtspEnable{true};
     bool rtpEnable{true};
@@ -87,6 +89,8 @@ public:
     std::string ip{"0.0.0.0"};
     /// RTSP port, integer [0:65535].
     int rtspPort{8554};
+    /// RTSPS port, integer [0:65535].
+    int rtspsPort{8555};
     /// RTP port, integer [0:65535].
     int rtpPort{5004};
     /// WebRTC port, integer [0:65535].
@@ -97,6 +101,8 @@ public:
     int srtPort{6000};
     /// RTMP port, integer [0:65535].
     int rtmpPort{1935};
+    /// RTMPS port, integer [0:65535].
+    int rtmpsPort{1936};
     /// Metadata port, integer [0:65535].
     int metadataPort{9000};
     /// RTSP protocol enable / disable, boolean: false - disable, true - enable.
@@ -185,8 +191,8 @@ public:
     /// 2 - Only terminal, 3 - File and terminal.
     int logLevel{0};
 
-    JSON_READABLE(VStreamerParams, enable, width, height, ip, rtspPort, rtpPort,
-                  webRtcPort, hlsPort, srtPort, rtmpPort, metadataPort,
+    JSON_READABLE(VStreamerParams, enable, width, height, ip, rtspPort, rtspsPort, rtpPort,
+                  webRtcPort, hlsPort, srtPort, rtmpPort, rtmpsPort, metadataPort,
                   rtspEnable, rtpEnable, webRtcEnable, hlsEnable, srtEnable,
                   rtmpEnable, metadataEnable, rtspMulticastIp, rtspMulticastPort,
                   user, password, suffix, metadataSuffix, minBitrateKbps,
@@ -233,6 +239,8 @@ enum class VStreamerParam
     IP,
     /// RTSP port, integer [0:65535].
     RTSP_PORT,
+    /// RTSPS port, integer [0:65535].
+    RTSPS_PORT,
     /// RTP port, integer [0:65535].
     RTP_PORT,
     /// WebRTC port, integer [0:65535].
@@ -243,6 +251,8 @@ enum class VStreamerParam
     SRT_PORT,
     /// RTMP port, integer [0:65535].
     RTMP_PORT,
+    /// RTMPS port, integer [0:65535].
+    RTMPS_PORT,
     /// Metadata port, integer [0:65535].
     METADATA_PORT,
     /// RTSP protocol enable / disable, integer: 0 - disable, 1 - enable.

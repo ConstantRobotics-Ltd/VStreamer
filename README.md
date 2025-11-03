@@ -455,6 +455,8 @@ enum class VStreamerParam
     IP,
     /// RTSP port, integer [0:65535].
     RTSP_PORT,
+    /// RTSPS port, integer [0:65535].
+    RTSPS_PORT,
     /// RTP port, integer [0:65535].
     RTP_PORT,
     /// WebRTC port, integer [0:65535].
@@ -465,6 +467,8 @@ enum class VStreamerParam
     SRT_PORT,
     /// RTMP port, integer [0:65535].
     RTMP_PORT,
+    /// RTMPS port, integer [0:65535].
+    RTMPS_PORT,
     /// Metadata port, integer [0:65535].
     METADATA_PORT,
     /// RTSP protocol enable / disable, integer: 0 - disable, 1 - enable.
@@ -564,11 +568,13 @@ enum class VStreamerParam
 | HEIGHT           | Video stream height, integer [0:8192]. Regardless of the resolution of the input video, if RAW data is processed, the streamer should scale the images according to this parameter. |
 | IP               | Streamer IP, string. It can be, for example, RTSP server IP or destination IP. Default value is **0.0.0.0** which is a universal IP to receive client connections from any IP.  |
 | RTSP_PORT        | Streamer's RTSP port, integer [0:65535]. |
+| RTSPS_PORT       | Streamer's RTSPS port, integer [0:65535]. |
 | RTP_PORT         | Streamer's RTP port, integer [0:65535]. Usually is used for RTP stream only or to determine port to stream video from streamer to video proxy. |
 | WEBRTC_PORT      | Streamer's WebRTC port, integer [0:65535]. |
 | HLS_PORT         | Streamer's HLS port, integer [0:65535]. |
 | SRT_PORT         | Streamer's SRT port, integer [0:65535]. |
 | RTMP_PORT        | Streamer's RTMP port, integer [0:65535]. |
+| RTMPS_PORT       | Streamer's RTMPS port, integer [0:65535]. |
 | METADATA_PORT    | Streamer's metadata port, integer [0:65535] (for example, for [KLV](https://en.wikipedia.org/wiki/KLV) metadata streaming.). |
 | RTSP_MODE        | RTSP protocol enable / disable, integer: **0** - disable, **1** - enable. |
 | RTP_MODE         | RTP protocol enable / disable, integer: **0** - disable, **1** - enable. |
@@ -637,6 +643,8 @@ public:
     std::string ip{"0.0.0.0"};
     /// RTSP port, integer [0:65535].
     int rtspPort{8554};
+    /// RTSPS port, integer [0:65535].
+    int rtspsPort{8555};
     /// RTP port, integer [0:65535].
     int rtpPort{5004};
     /// WebRTC port, integer [0:65535].
@@ -647,6 +655,8 @@ public:
     int srtPort{6000};
     /// RTMP port, integer [0:65535].
     int rtmpPort{1935};
+    /// RTMPS port, integer [0:65535].
+    int rtmpsPort{1936};
     /// Metadata port, integer [0:65535].
     int metadataPort{9000};
     /// RTSP protocol enable / disable, boolean: false - disable, true - enable.
@@ -735,8 +745,8 @@ public:
     /// 2 - Only terminal, 3 - File and terminal.
     int logLevel{0};
 
-    JSON_READABLE(VStreamerParams, enable, width, height, ip, rtspPort, rtpPort,
-                  webRtcPort, hlsPort, srtPort, rtmpPort, metadataPort,
+    JSON_READABLE(VStreamerParams, enable, width, height, ip, rtspPort, rtspsPort, rtpPort,
+                  webRtcPort, hlsPort, srtPort, rtmpPort, rtmpsPort, metadataPort,
                   rtspEnable, rtpEnable, webRtcEnable, hlsEnable, srtEnable,
                   rtmpEnable, metadataEnable, rtspMulticastIp, rtspMulticastPort,
                   user, password, suffix, metadataSuffix, minBitrateKbps,
@@ -764,11 +774,13 @@ public:
 | height           | Video stream height, integer [0:8192]. Regardless of the resolution of the input video, if RAW data is processed, the streamer should scale the images according to this parameter. |
 | ip               |Streamer IP, string. It can be, for example, RTSP server IP or destination IP. Default value is **0.0.0.0** which is a universal IP to receive client connections from any IP.  |
 | rtspPort        | Streamer's RTSP port, integer [0:65535]. |
+| rtspsPort       | Streamer's RTSPS port, integer [0:65535]. |
 | rtpPort         | Streamer's RTP port, integer [0:65535]. Usually is used for RTP stream only or to determine port to stream video from streamer to video proxy. |
 | webRtcPort      | Streamer's WebRTC port, integer [0:65535]. |
 | hlsPort         | Streamer's HLS port, integer [0:65535]. |
 | srtPort         | Streamer's SRC port, integer [0:65535]. |
 | rtmpPort        | Streamer's RTMP port, integer [0:65535]. |
+| rtmpsPort       | Streamer's RTMPS port, integer [0:65535]. |
 | metadataPort    | Streamer's metadata port, integer [0:65535] (for example, for [KLV](https://en.wikipedia.org/wiki/KLV) metadata streaming.). |
 | rtspEnable      | RTSP protocol enable / disable, boolean: **false** - disable, **true** - enable. |
 | rtpEnable       | RTP protocol enable / disable, boolean:**false** - disable, **true** - enable. |
@@ -840,11 +852,13 @@ struct VStreamerParamsMask
     bool height{true};
     bool ip{true};
     bool rtspPort{true};
+    bool rtspsPort{true};
     bool rtpPort{true};
     bool webRtcPort{true};
     bool hlsPort{true};
     bool srtPort{true};
     bool rtmpPort{true};
+    bool rtmpsPort{true};
     bool metadataPort{true};
     bool rtspEnable{true};
     bool rtpEnable{true};
@@ -987,58 +1001,60 @@ if(!outConfig.readFromFile("TestVStreamerParams.json"))
 {
     "vStreamerParams": 
     {
-        "bitrateKbps": 9365,
-        "bitrateMode": 1963,
+        "bitrateKbps": 45157,
+        "bitrateMode": 53395,
         "codec": "dkgvmkrnjv",
-        "custom1": 53395.0,
-        "custom2": 12255.0,
-        "custom3": 32446.0,
+        "custom1": 16353.0,
+        "custom2": 30513.0,
+        "custom3": 16213.0,
         "enable": false,
-        "fitMode": 6818,
-        "fps": 55981.0,
-        "gop": 56847,
-        "h264Profile": 35074,
-        "height": 9559,
+        "fitMode": 14594,
+        "fps": 12255.0,
+        "gop": 32446,
+        "h264Profile": 17051,
+        "height": 44304,
         "hlsCert": "24kjcnnv",
         "hlsEnable": false,
         "hlsEncryption": "wieufjpowkf",
         "hlsKey": "wqlovf;qb",
-        "hlsPort": 37042,
+        "hlsPort": 9365,
         "ip": "sfspfo9jbjnbjhklvllks",
-        "jpegQuality": 47135,
-        "logLevel": 2,
-        "maxBitrateKbps": 50955,
+        "jpegQuality": 22605,
+        "logLevel": 0,
+        "maxBitrateKbps": 11267,
         "metadataEnable": false,
-        "metadataPort": 42745,
+        "metadataPort": 35074,
         "metadataSuffix": "z.,nfpowe",
-        "minBitrateKbps": 31062,
+        "minBitrateKbps": 6818,
         "overlayEnable": true,
         "password": "sddgoihw,",
         "rtmpCert": "wfpomv",
         "rtmpEnable": true,
         "rtmpEncryption": "skldfjdf",
         "rtmpKey": "dkkkkjfkjdkjfkj2134",
-        "rtmpPort": 44304,
+        "rtmpPort": 55981,
+        "rtmpsPort": 1936,
         "rtpEnable": true,
-        "rtpPort": 12188,
+        "rtpPort": 31062,
         "rtspCert": "lkjrkjg",
         "rtspEnable": true,
         "rtspEncryption": "quyen",
         "rtspKey": "dh;skcsf",
         "rtspMulticastIp": "wpofuihifo",
-        "rtspMulticastPort": 61834,
-        "rtspPort": 42216,
+        "rtspMulticastPort": 47135,
+        "rtspPort": 42745,
+        "rtspsPort": 56847,
         "srtEnable": true,
-        "srtPort": 48849,
+        "srtPort": 1963,
         "suffix": "pisfhcowmfv",
-        "type": 45157,
+        "type": 5617,
         "user": "slfljkv",
         "webRtcCert": "erghshiAJ",
         "webRtcEnable": false,
         "webRtcEncryption": "l;uoykh",
         "webRtcKey": "WERUHUHFE",
-        "webRtcPort": 47479,
-        "width": 43365
+        "webRtcPort": 50955,
+        "width": 48849
     }
 }
 ```

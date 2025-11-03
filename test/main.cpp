@@ -17,11 +17,13 @@ void fillRandomData(VStreamerParams &a)
     a.height = rand() % 65535 + 1;
     a.ip = "sfspfo9jbjnbjhklvllks";
     a.rtspPort = rand() % 65535 + 1;
+    a.rtspsPort = rand() % 65535 + 1;
     a.rtpPort = rand() % 65535 + 1;
     a.webRtcPort = rand() % 65535 + 1;
     a.hlsPort = rand() % 65535 + 1;
     a.srtPort = rand() % 65535 + 1;
     a.rtmpPort = rand() % 65535 + 1;
+    a.rtspsPort = rand() % 65535 + 1;
     a.metadataPort = rand() % 65535 + 1;
     a.rtspEnable = true;
     a.rtpEnable = true;
@@ -408,7 +410,16 @@ bool compareParams(VStreamerParams &a, VStreamerParams &b, VStreamerParamsMask* 
         cout << "logLevel" << endl;
         return false;
     }
-    
+    if (mask->rtspsPort && (a.rtspsPort != b.rtspsPort))
+    {
+        cout << "rtspsPort" << endl;
+        return false;
+    }
+    if (mask->rtmpsPort && (a.rtmpsPort != b.rtmpsPort))
+    {
+        cout << "rtmpsPort" << endl;
+        return false;
+    }
     return true;
 }
 
@@ -605,6 +616,8 @@ bool serializeDeserializeWithMaskTest()
     mask.rtmpEncryption = false;
     mask.hlsEncryption = true;
     mask.logLevel = true;
+    mask.rtspsPort = true;
+    mask.rtmpsPort = true;
 
     // Encode data.
     uint8_t data[1024];

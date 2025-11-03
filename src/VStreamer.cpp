@@ -428,6 +428,20 @@ bool VStreamerParams::serialize(uint8_t *data, int bufferSize, int &size, VStrea
         data[9] |= (1 << 3);
     }
 
+    if (mask->rtspsPort && (bufferSize > pos + sizeof(int)))
+    {
+        memcpy(&data[pos], &rtspsPort, sizeof(int));
+        pos += sizeof(int);
+        data[9] |= (1 << 2);
+    }
+
+    if (mask->rtmpsPort && (bufferSize > pos + sizeof(int)))
+    {
+        memcpy(&data[pos], &rtmpsPort, sizeof(int));
+        pos += sizeof(int);
+        data[9] |= (1 << 1);
+    }
+
     size = pos;
 
     return true;
@@ -1089,6 +1103,30 @@ bool VStreamerParams::deserialize(uint8_t *data, int dataSize)
     else
     {
         logLevel = 0;
+    }
+
+    if (checkBit(data[9], 2))
+    {
+        if (dataSize < pos + sizeof(int))
+            return false;
+        memcpy(&rtspsPort, &data[pos], sizeof(int));
+        pos += sizeof(int);
+    }
+    else
+    {
+        rtspsPort = 0;
+    }
+
+    if (checkBit(data[9], 1))
+    {
+        if (dataSize < pos + sizeof(int))
+            return false;
+        memcpy(&rtmpsPort, &data[pos], sizeof(int));
+        pos += sizeof(int);
+    }
+    else
+    {
+        rtmpsPort = 0;
     }
 
     return true;
