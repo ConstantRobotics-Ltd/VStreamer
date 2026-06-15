@@ -53,7 +53,7 @@ bool VStreamerParams::serialize(uint8_t *data, int bufferSize, int &size, VStrea
     VStreamerParamsMask defaultMask;
     if (mask == nullptr)
         mask = &defaultMask;
-    
+
     // Fill data.
     int pos = 10;
 
@@ -440,6 +440,13 @@ bool VStreamerParams::serialize(uint8_t *data, int bufferSize, int &size, VStrea
         memcpy(&data[pos], &rtmpsPort, sizeof(int));
         pos += sizeof(int);
         data[9] |= (1 << 1);
+    }
+
+    if (mask->directStreamType && (bufferSize > pos + (int)directStreamType.size() + 1))
+    {
+        memcpy(&data[pos], directStreamType.c_str(), directStreamType.size() + 1);
+        pos += directStreamType.size() + 1;
+        data[9] |= (1 << 0);
     }
 
     size = pos;
@@ -1127,6 +1134,18 @@ bool VStreamerParams::deserialize(uint8_t *data, int dataSize)
     else
     {
         rtmpsPort = 0;
+    }
+
+    if (checkBit(data[9], 0))
+    {
+        memset(strArray, 0, 512);
+        strcpy(strArray, (char *)&data[pos]);
+        pos += strlen(strArray) + 1;
+        directStreamType = strArray;
+    }
+    else
+    {
+        directStreamType = "rtp";
     }
 
     return true;

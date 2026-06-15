@@ -4,7 +4,7 @@
 
 # **VStreamer interface C++ library**
 
-**v2.0.0**
+**v2.1.0**
 
 
 
@@ -59,6 +59,7 @@ The **VStreamer** C++ library provides a standard interface and defines data str
 | 1.1.3   | 10.07.2024   | - Submodules updated.<br />- CMake updated. |
 | 1.1.4   | 31.10.2024   | - Updated VCodec interface.    |
 | 2.0.0   | 01.11.2025   | - Updated VStreamer interface to support new video servers. |
+| 2.1.0   | 15.06.2026   | - New **directStreamType** parameter to select direct stream transport: RTP, MPEG-TS (STANAG 4609) or MPEG-TS over RTP. |
 
 
 
@@ -187,7 +188,7 @@ std::cout << "VStreamer class version: " << VStreamer::getVersion();
 Console output:
 
 ```bash
-VStreamer class version: 2.0.0
+VStreamer class version: 2.1.0
 ```
 
 
@@ -555,7 +556,9 @@ enum class VStreamerParam
     HLS_ENCRYPTION,
     /// Logging mode. Values: 0 - Disable, 1 - Only file,
     /// 2 - Only terminal, 3 - File and terminal.
-    LOG_LEVEL
+    LOG_LEVEL,
+    /// Direct stream transport, string: "rtp", "mpegts", "mpegts-rtp".
+    DIRECT_STREAM_TYPE
 };
 ```
 
@@ -618,6 +621,7 @@ enum class VStreamerParam
 | RTMP_ENCRYPTION  | RTMP encryption type, string: **""** or **"no"**, **"strict"**, **"optional"**. |
 | HLS_ENCRYPTION   | HLS encryption type, string: **""** or **"no"**, **"yes"**. |
 | LOG_LEVEL        | Logging mode. Values: **0** - Disable, **1** - Only file, **2** - Only terminal, **3** - File and terminal. |
+| DIRECT_STREAM_TYPE | Transport of the direct (user-facing) stream, string: **"rtp"** (default, codec RTP), **"mpegts"** (MPEG-TS over UDP, MISB ST 1402 / STANAG 4609) or **"mpegts-rtp"** (MPEG-TS over RTP, MISB ST 1403). In **mpegts** / **mpegts-rtp** the stream carries KLV metadata per STANAG 4609. **JPEG** supports **"rtp"** only. |
 
 
 
@@ -744,6 +748,10 @@ public:
     /// Logging mode. Values: 0 - Disable, 1 - Only file,
     /// 2 - Only terminal, 3 - File and terminal.
     int logLevel{0};
+    /// Direct stream transport: "rtp", "mpegts" (MISB ST 1402, STANAG 4609),
+    /// "mpegts-rtp" (MISB ST 1403). "mpegts"/"mpegts-rtp" carry KLV metadata.
+    /// JPEG supports "rtp" only. Default "rtp".
+    std::string directStreamType{"rtp"};
 
     JSON_READABLE(VStreamerParams, enable, width, height, ip, rtspPort, rtspsPort, rtpPort,
                   webRtcPort, hlsPort, srtPort, rtmpPort, rtmpsPort, metadataPort,
@@ -754,7 +762,8 @@ public:
                   jpegQuality, codec, fitMode, overlayEnable, type, custom1,
                   custom2, custom3, rtspKey, rtspCert, webRtcKey, webRtcCert,
                   hlsKey, hlsCert, rtmpKey, rtmpCert, rtspEncryption,
-                  webRtcEncryption, rtmpEncryption, hlsEncryption, logLevel)
+                  webRtcEncryption, rtmpEncryption, hlsEncryption, logLevel,
+                  directStreamType)
 
     /// Serialize parameters.
     bool serialize(uint8_t* data, int bufferSize, int& size,
@@ -824,12 +833,13 @@ public:
 | rtmpEncryption  | RTMP encryption type, string: **""** or **"no"**, **"strict"**, **"optional"**. |
 | hlsEncryption   | HLS encryption type, string: **""** or **"no"**, **"yes"**. |
 | logLevel        | Logging mode. Values: **0** - Disable, **1** - Only file, **2** - Only terminal, **3** - File and terminal. |
+| directStreamType | Transport of the direct (user-facing) stream, string: **"rtp"** (default, codec RTP), **"mpegts"** (MPEG-TS over UDP, MISB ST 1402 / STANAG 4609) or **"mpegts-rtp"** (MPEG-TS over RTP, MISB ST 1403). In **mpegts** / **mpegts-rtp** the stream carries KLV metadata per STANAG 4609. **JPEG** supports **"rtp"** only. |
 
 
 
 ## Serialize video streamer parameters
 
-The **VStreamerParams** class provides a method **serialize(...)** to serialize video streamer parameters (fields of the [VStreamerParams](#vstreamerparams-class-description) class). Serialization of video streamer parameters is necessary when you need to send video streamer parameters via communication channels. The method provides options to exclude particular parameters from serialization. To do this, the method inserts a binary mask (5 bytes) where each bit represents a particular parameter and the **deserialize(...)** method recognizes it. Method declaration:
+The **VStreamerParams** class provides a method **serialize(...)** to serialize video streamer parameters (fields of the [VStreamerParams](#vstreamerparams-class-description) class). Serialization of video streamer parameters is necessary when you need to send video streamer parameters via communication channels. The method provides options to exclude particular parameters from serialization. To do this, the method inserts a binary mask (7 bytes) where each bit represents a particular parameter and the **deserialize(...)** method recognizes it. Method declaration:
 
 ```cpp
 bool serialize(uint8_t* data, int bufferSize, int& size, VStreamerParamsMask* mask = nullptr);
@@ -902,6 +912,7 @@ struct VStreamerParamsMask
     bool rtmpEncryption{true};
     bool hlsEncryption{true};
     bool logLevel{true};
+    bool directStreamType{true};
 };
 ```
 
@@ -1007,6 +1018,7 @@ if(!outConfig.readFromFile("TestVStreamerParams.json"))
         "custom1": 16353.0,
         "custom2": 30513.0,
         "custom3": 16213.0,
+        "directStreamType": "rtp",
         "enable": false,
         "fitMode": 14594,
         "fps": 12255.0,
