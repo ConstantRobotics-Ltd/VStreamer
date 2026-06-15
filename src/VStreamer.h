@@ -71,6 +71,7 @@ struct VStreamerParamsMask
     bool rtmpEncryption{true};
     bool hlsEncryption{true};
     bool logLevel{true};
+    bool directStreamType{true};
 };
 
 /**
@@ -190,6 +191,13 @@ public:
     /// Logging mode. Values: 0 - Disable, 1 - Only file,
     /// 2 - Only terminal, 3 - File and terminal.
     int logLevel{0};
+    /// Transport for the direct RTP/MPEG-TS stream to the user.
+    /// Values: "rtp", "mpegts" (MISB ST 1402), "mpegts-rtp" (MISB ST 1403).
+    /// "mpegts"/"mpegts-rtp" carry KLV per STANAG 4609. JPEG supports "rtp" only.
+    /// Note: the loopback stream to MediaMTX is always RTP (KLV survives the
+    /// MediaMTX re-mux only over RTP, not MPEG-TS), so there is no separate
+    /// MediaMTX transport selector.
+    std::string directStreamType{"rtp"};
 
     JSON_READABLE(VStreamerParams, enable, width, height, ip, rtspPort, rtspsPort, rtpPort,
                   webRtcPort, hlsPort, srtPort, rtmpPort, rtmpsPort, metadataPort,
@@ -200,7 +208,8 @@ public:
                   jpegQuality, codec, fitMode, overlayEnable, type, custom1,
                   custom2, custom3, rtspKey, rtspCert, webRtcKey, webRtcCert,
                   hlsKey, hlsCert, rtmpKey, rtmpCert, rtspEncryption,
-                  webRtcEncryption, rtmpEncryption, hlsEncryption, logLevel)
+                  webRtcEncryption, rtmpEncryption, hlsEncryption, logLevel,
+                  directStreamType)
 
     /**
      * @brief Serialize parameters.
@@ -339,7 +348,9 @@ enum class VStreamerParam
     HLS_ENCRYPTION,
     /// Logging mode. Values: 0 - Disable, 1 - Only file,
     /// 2 - Only terminal, 3 - File and terminal.
-    LOG_LEVEL 
+    LOG_LEVEL,
+    /// Direct stream transport, string: "rtp", "mpegts", "mpegts-rtp".
+    DIRECT_STREAM_TYPE
 };
 
 
