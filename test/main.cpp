@@ -15,10 +15,10 @@ void fillRandomData(VStreamerParams &a)
     a.enable = false;
     a.width = rand() % 65535 + 1;
     a.height = rand() % 65535 + 1;
-    a.ip = "sfspfo9jbjnbjhklvllks";
+    a.directStreamIp = "sfspfo9jbjnbjhklvllks";
     a.rtspPort = rand() % 65535 + 1;
     a.rtspsPort = rand() % 65535 + 1;
-    a.rtpPort = rand() % 65535 + 1;
+    a.directStreamPort = rand() % 65535 + 1;
     a.webRtcPort = rand() % 65535 + 1;
     a.hlsPort = rand() % 65535 + 1;
     a.srtPort = rand() % 65535 + 1;
@@ -26,7 +26,7 @@ void fillRandomData(VStreamerParams &a)
     a.rtspsPort = rand() % 65535 + 1;
     a.metadataPort = rand() % 65535 + 1;
     a.rtspEnable = true;
-    a.rtpEnable = true;
+    a.directStreamEnable = true;
     a.webRtcEnable = false;
     a.hlsEnable = false;
     a.srtEnable = true;
@@ -67,6 +67,12 @@ void fillRandomData(VStreamerParams &a)
     a.rtmpEncryption = "skldfjdf";
     a.hlsEncryption = "wieufjpowkf";
     a.logLevel = rand() % 4;
+    a.directStreamType = rand() % 3;
+    a.directStreamBitrateKbps = rand() % 65535 + 1;
+    a.directStreamMaxPayloadSize = rand() % 65535 + 1;
+    a.directStreamPacingMode = rand() % 2;
+    a.serverStreamType = rand() % 2;
+    a.klvMode = rand() % 2;
 }
 
 
@@ -161,9 +167,9 @@ bool compareParams(VStreamerParams &a, VStreamerParams &b, VStreamerParamsMask* 
         cout << "height" << endl;
         return false;
     }
-    if (mask->ip && (a.ip != b.ip))
+    if (mask->directStreamIp && (a.directStreamIp != b.directStreamIp))
     {
-        cout << "ip" << endl;
+        cout << "directStreamIp" << endl;
         return false;
     }
     if (mask->rtspPort && (a.rtspPort != b.rtspPort))
@@ -171,9 +177,9 @@ bool compareParams(VStreamerParams &a, VStreamerParams &b, VStreamerParamsMask* 
         cout << "rtspPort" << endl;
         return false;
     }
-    if (mask->rtpPort && (a.rtpPort != b.rtpPort))
+    if (mask->directStreamPort && (a.directStreamPort != b.directStreamPort))
     {
-        cout << "rtpPort" << endl;
+        cout << "directStreamPort" << endl;
         return false;
     }
     if (mask->webRtcPort && (a.webRtcPort != b.webRtcPort))
@@ -206,9 +212,9 @@ bool compareParams(VStreamerParams &a, VStreamerParams &b, VStreamerParamsMask* 
         cout << "rtspEnable" << endl;
         return false;
     }
-    if (mask->rtpEnable && (a.rtpEnable != b.rtpEnable))
+    if (mask->directStreamEnable && (a.directStreamEnable != b.directStreamEnable))
     {
-        cout << "rtpEnable" << endl;
+        cout << "directStreamEnable" << endl;
         return false;
     }
     if (mask->webRtcEnable && (a.webRtcEnable != b.webRtcEnable))
@@ -319,6 +325,7 @@ bool compareParams(VStreamerParams &a, VStreamerParams &b, VStreamerParamsMask* 
     if (mask->cycleTimeUs && (a.cycleTimeUs != b.cycleTimeUs))
     {
         cout << "cycleTimeUs" << endl;
+        return false;
     }
     if (mask->overlayEnable && (a.overlayEnable != b.overlayEnable))    
     {
@@ -418,6 +425,36 @@ bool compareParams(VStreamerParams &a, VStreamerParams &b, VStreamerParamsMask* 
     if (mask->rtmpsPort && (a.rtmpsPort != b.rtmpsPort))
     {
         cout << "rtmpsPort" << endl;
+        return false;
+    }
+    if (mask->directStreamType && (a.directStreamType != b.directStreamType))
+    {
+        cout << "directStreamType" << endl;
+        return false;
+    }
+    if (mask->directStreamBitrateKbps && (a.directStreamBitrateKbps != b.directStreamBitrateKbps))
+    {
+        cout << "directStreamBitrateKbps" << endl;
+        return false;
+    }
+    if (mask->directStreamMaxPayloadSize && (a.directStreamMaxPayloadSize != b.directStreamMaxPayloadSize))
+    {
+        cout << "directStreamMaxPayloadSize" << endl;
+        return false;
+    }
+    if (mask->directStreamPacingMode && (a.directStreamPacingMode != b.directStreamPacingMode))
+    {
+        cout << "directStreamPacingMode" << endl;
+        return false;
+    }
+    if (mask->serverStreamType && (a.serverStreamType != b.serverStreamType))
+    {
+        cout << "serverStreamType" << endl;
+        return false;
+    }
+    if (mask->klvMode && (a.klvMode != b.klvMode))
+    {
+        cout << "klvMode" << endl;
         return false;
     }
     return true;
@@ -549,8 +586,13 @@ bool jsonReadWriteTest()
         return false;
     }
 
+    // cycleTimeUs is a calculated field and is not stored in JSON, so exclude
+    // it from the comparison.
+    VStreamerParamsMask mask;
+    mask.cycleTimeUs = false;
+
     // Compare params.
-    return compareParams(in, out);
+    return compareParams(in, out, &mask);
 }
 
 
@@ -566,16 +608,16 @@ bool serializeDeserializeWithMaskTest()
     mask.enable = true;
     mask.width = true;
     mask.height = false;
-    mask.ip = true;
+    mask.directStreamIp = true;
     mask.rtspPort = true;
-    mask.rtpPort = false;
+    mask.directStreamPort = false;
     mask.webRtcPort = true;
     mask.hlsPort = false;
     mask.srtPort = false;
     mask.rtmpPort = false;
     mask.metadataPort = true;
     mask.rtspEnable = true;
-    mask.rtpEnable = true;
+    mask.directStreamEnable = true;
     mask.webRtcEnable = false;
     mask.hlsEnable = false;
     mask.srtEnable = true;
@@ -618,6 +660,12 @@ bool serializeDeserializeWithMaskTest()
     mask.logLevel = true;
     mask.rtspsPort = true;
     mask.rtmpsPort = true;
+    mask.directStreamType = true;
+    mask.directStreamBitrateKbps = false;
+    mask.directStreamMaxPayloadSize = true;
+    mask.directStreamPacingMode = false;
+    mask.serverStreamType = true;
+    mask.klvMode = false;
 
     // Encode data.
     uint8_t data[1024];

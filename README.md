@@ -460,7 +460,7 @@ enum class VStreamerParam
     RTSP_PORT,
     /// RTSPS port, integer [0:65535].
     RTSPS_PORT,
-    /// RTP port, integer [0:65535].
+    /// Destination port of the direct stream, integer [0:65535].
     DIRECT_STREAM_PORT,
     /// WebRTC port, integer [0:65535].
     WEBRTC_PORT,
@@ -476,7 +476,7 @@ enum class VStreamerParam
     METADATA_PORT,
     /// RTSP protocol enable / disable, integer: 0 - disable, 1 - enable.
     RTSP_MODE,
-    /// RTP protocol enable / disable, integer: 0 - disable, 1 - enable.
+    /// Direct stream enable / disable, integer: 0 - disable, 1 - enable.
     DIRECT_STREAM_ENABLE,
     /// WebRTC protocol enable / disable, integer: 0 - disable, 1 - enable.
     WEBRTC_MODE,
@@ -559,8 +559,22 @@ enum class VStreamerParam
     /// Logging mode. Values: 0 - Disable, 1 - Only file,
     /// 2 - Only terminal, 3 - File and terminal.
     LOG_LEVEL,
-    /// Direct stream transport, string: "rtp", "mpegts", "mpegts-rtp".
-    DIRECT_STREAM_TYPE
+    /// Direct stream transport/type, integer: 0 - rtp, 1 - mpegts, 2 - mpegts-rtp.
+    DIRECT_STREAM_TYPE,
+    /// Direct stream target bitrate, integer kbps (>= 0).
+    DIRECT_STREAM_BITRATE_KBPS,
+    /// Direct stream max UDP/RTP payload size, integer bytes [256:65535].
+    DIRECT_STREAM_MAX_PAYLOAD,
+    /// Direct stream pacing mode, integer: 0 - target bitrate, 1 - back-pressure.
+    DIRECT_STREAM_PACING_MODE,
+    /// Server-delivered stream type, integer: 0 - rtp (codec-RTP + SDP),
+    /// 1 - mpegts (STANAG 4609 MPEG-TS; the media server re-serves KLV
+    /// natively). Distinct from RTSP_MODE (RTSP protocol enable/disable).
+    SERVER_STREAM_TYPE,
+    /// KLV signalling for MPEG-TS paths, integer: 0 - asynchronous
+    /// (stream_type 0x06 + "KLVA"), 1 - synchronous (stream_type 0x15 +
+    /// metadata_descriptor + metadata_AU_cell). MISB ST 0604.
+    KLV_MODE
 };
 ```
 
@@ -574,7 +588,7 @@ enum class VStreamerParam
 | DIRECT_STREAM_IP | Destination IP of the direct stream (point-to-point, bypasses MediaMTX), string. Transport is set by directStreamType. Default **127.0.0.1**. |
 | RTSP_PORT        | Streamer's RTSP port, integer [0:65535]. |
 | RTSPS_PORT       | Streamer's RTSPS port, integer [0:65535]. |
-| DIRECT_STREAM_PORT         | Streamer's RTP port, integer [0:65535]. Usually is used for RTP stream only or to determine port to stream video from streamer to video proxy. |
+| DIRECT_STREAM_PORT         | Destination port of the direct stream (point-to-point, bypasses MediaMTX), integer [0:65535]. |
 | WEBRTC_PORT      | Streamer's WebRTC port, integer [0:65535]. |
 | HLS_PORT         | Streamer's HLS port, integer [0:65535]. |
 | SRT_PORT         | Streamer's SRT port, integer [0:65535]. |
@@ -582,7 +596,7 @@ enum class VStreamerParam
 | RTMPS_PORT       | Streamer's RTMPS port, integer [0:65535]. |
 | METADATA_PORT    | Streamer's metadata port, integer [0:65535] (for example, for [KLV](https://en.wikipedia.org/wiki/KLV) metadata streaming.). |
 | RTSP_MODE        | RTSP protocol enable / disable, integer: **0** - disable, **1** - enable. |
-| DIRECT_STREAM_ENABLE         | RTP protocol enable / disable, integer: **0** - disable, **1** - enable. |
+| DIRECT_STREAM_ENABLE         | Direct stream (point-to-point, bypasses MediaMTX) enable / disable, integer: **0** - disable, **1** - enable. |
 | WEBRTC_MODE      | WebRTC protocol enable / disable, integer: **0** - disable, **1** - enable. |
 | HLS_MODE         | HLS protocol enable / disable, integer: **0** - disable, **1** - enable. |
 | SRT_MODE         | SRT protocol enable / disable, integer: **0** - disable, **1** - enable. |
@@ -623,7 +637,12 @@ enum class VStreamerParam
 | RTMP_ENCRYPTION  | RTMP encryption type, string: **""** or **"no"**, **"strict"**, **"optional"**. |
 | HLS_ENCRYPTION   | HLS encryption type, string: **""** or **"no"**, **"yes"**. |
 | LOG_LEVEL        | Logging mode. Values: **0** - Disable, **1** - Only file, **2** - Only terminal, **3** - File and terminal. |
-| DIRECT_STREAM_TYPE | Transport of the direct (user-facing) stream, string: **"rtp"** (default, codec RTP), **"mpegts"** (MPEG-TS over UDP, MISB ST 1402 / STANAG 4609) or **"mpegts-rtp"** (MPEG-TS over RTP, MISB ST 1403). In **mpegts** / **mpegts-rtp** the stream carries KLV metadata per STANAG 4609. **JPEG** supports **"rtp"** only. |
+| DIRECT_STREAM_TYPE | Transport/type of the direct (user-facing) stream, integer index: **0** - rtp (default, codec RTP), **1** - mpegts (MPEG-TS over UDP, MISB ST 1402 / STANAG 4609), **2** - mpegts-rtp (MPEG-TS over RTP, MISB ST 1403). In **1** / **2** the stream carries KLV metadata per STANAG 4609. **JPEG** supports **0** only. |
+| DIRECT_STREAM_BITRATE_KBPS | Target sending bitrate for the direct stream, integer kbps (**>= 0**). Used as the pacer target when **DIRECT_STREAM_PACING_MODE** is **0**. |
+| DIRECT_STREAM_MAX_PAYLOAD | Maximum UDP/RTP payload size for the direct stream, integer bytes **[256:65535]**. Keep **~1420** (MTU 1500) for normal use; large values are for **localhost / trusted LAN** only. Applies to the rtp / mpegts-rtp transports. |
+| DIRECT_STREAM_PACING_MODE | Pacing mode of the direct stream, integer: **0** - target bitrate (token-bucket, uses **DIRECT_STREAM_BITRATE_KBPS**), **1** - back-pressure (kernel send-buffer occupancy). |
+| SERVER_STREAM_TYPE | Transport/type of the **server-delivered** stream — fed to the media server, which fans it out to clients (RTSP/SRT/HLS/RTMP/WebRTC). Integer: **0** - rtp (codec-RTP + SDP, KLV muxed as a metadata track), **1** - mpegts (STANAG 4609 MPEG-TS; the server demuxes the KLV PID and re-serves it as a native KLV track). Distinct from **RTSP_MODE** (RTSP protocol enable/disable). |
+| KLV_MODE | KLV signalling for the MPEG-TS paths (direct mpegts/mpegts-rtp and the mpegts loopback), integer: **0** - asynchronous (stream_type 0x06 + "KLVA" registration, raw KLV), **1** - synchronous (stream_type 0x15 + metadata_descriptor + metadata_std_descriptor, KLV in a metadata_AU_cell). MISB ST 0604. Ignored for the rtp transport. |
 
 
 
@@ -651,7 +670,7 @@ public:
     int rtspPort{8554};
     /// RTSPS port, integer [0:65535].
     int rtspsPort{8555};
-    /// RTP port, integer [0:65535].
+    /// Destination port of the direct stream, integer [0:65535].
     int directStreamPort{5004};
     /// WebRTC port, integer [0:65535].
     int webRtcPort{7000};
@@ -667,7 +686,7 @@ public:
     int metadataPort{9000};
     /// RTSP protocol enable / disable, boolean: false - disable, true - enable.
     bool rtspEnable{true};
-    /// RTP protocol enable / disable, boolean: false - disable, true - enable.
+    /// Direct stream (point-to-point, bypasses MediaMTX) enable / disable, boolean: false - disable, true - enable.
     bool directStreamEnable{true};
     /// WebRTC protocol enable / disable, boolean: false - disable, true - enable.
     bool webRtcEnable{true};
@@ -683,10 +702,10 @@ public:
     std::string rtspMulticastIp{"224.1.0.1/16"};
     /// RTSP multicast port, integer [0:65535].
     int rtspMulticastPort{18000};
-    /// Streamer user (for RTSP streaming), string: "" - no user.
-    std::string user{""};
-    /// Streamer password (for RTSP streaming), string: "" - no password.
-    std::string password{""};
+    /// Streamer user (for RTSP streaming), string: "" or "no" - no user.
+    std::string user{"no"};
+    /// Streamer password (for RTSP streaming), string: "" or "no" - no password.
+    std::string password{"no"};
     /// Streamer suffix for RTSP streaming (stream name), string: "" - no suffix.
     std::string suffix{"live"};
     /// Metadata suffix (stream name), string: "" - no suffix.
@@ -764,8 +783,10 @@ public:
     /// Pacing mode of the direct stream, integer: 0 - target bitrate
     /// (token-bucket), 1 - back-pressure (kernel send-buffer occupancy).
     int directStreamPacingMode{0};
-    /// MediaMTX delivery mode, integer: 0 - simple (codec-RTP + SDP),
-    /// 1 - mpegts (STANAG 4609; MediaMTX re-serves KLV as a native track).
+    /// Transport/type of the server-delivered stream (fed to the media
+    /// server, which fans it out to clients), integer: 0 - rtp (codec-RTP +
+    /// SDP, KLV as a metadata track), 1 - mpegts (STANAG 4609; the server
+    /// re-serves KLV as a native track).
     /// Distinct from rtspEnable (RTSP protocol enable/disable).
     int serverStreamType{0};
     /// KLV signalling for the MPEG-TS paths, integer: 0 - asynchronous
@@ -812,15 +833,15 @@ public:
 | directStreamIp | Destination IP of the direct stream (point-to-point, bypasses MediaMTX), string. Transport is set by directStreamType. Default **127.0.0.1**. |
 | rtspPort        | Streamer's RTSP port, integer [0:65535]. |
 | rtspsPort       | Streamer's RTSPS port, integer [0:65535]. |
-| directStreamPort         | Streamer's RTP port, integer [0:65535]. Usually is used for RTP stream only or to determine port to stream video from streamer to video proxy. |
+| directStreamPort         | Destination port of the direct stream (point-to-point, bypasses MediaMTX), integer [0:65535]. |
 | webRtcPort      | Streamer's WebRTC port, integer [0:65535]. |
 | hlsPort         | Streamer's HLS port, integer [0:65535]. |
-| srtPort         | Streamer's SRC port, integer [0:65535]. |
+| srtPort         | Streamer's SRT port, integer [0:65535]. |
 | rtmpPort        | Streamer's RTMP port, integer [0:65535]. |
 | rtmpsPort       | Streamer's RTMPS port, integer [0:65535]. |
 | metadataPort    | Streamer's metadata port, integer [0:65535] (for example, for [KLV](https://en.wikipedia.org/wiki/KLV) metadata streaming.). |
 | rtspEnable      | RTSP protocol enable / disable, boolean: **false** - disable, **true** - enable. |
-| directStreamEnable       | RTP protocol enable / disable, boolean:**false** - disable, **true** - enable. |
+| directStreamEnable       | Direct stream (point-to-point, bypasses MediaMTX) enable / disable, boolean: **false** - disable, **true** - enable. |
 | webRtcEnable    | WebRTC protocol enable / disable, boolean: **false** - disable, **true** - enable. |
 | hlsEnable       | HLS protocol enable / disable, boolean: **false** - disable, **true** - enable. |
 | srtEnable       | SRT protocol enable / disable, boolean: **false** - disable, **true** - enable. |
@@ -828,8 +849,8 @@ public:
 | metadataEnable  | Metadata protocol enable / disable, boolean: **false** - disable, **true** - enable. |
 | rtspMulticastIp | RTSP multicast IP, string. Usually video server accepts range of IPs (default value **224.1.0.1/16**). Some video streamer may support only single IP (example **224.1.0.1/32**). This parameters is used only with IP mask. |
 | rtspMulticastPort | RTSP multicast port, integer [0:65535]. |
-| user            | Streamer user (for rtsp streaming), string: **""** - no user. |
-| password        | Streamer password (for RTSP streaming), string: **""** - no password. |
+| user            | Streamer user (for RTSP streaming), string: **""** or **"no"** - no user. |
+| password        | Streamer password (for RTSP streaming), string: **""** or **"no"** - no password. |
 | suffix          | Streamer suffix for RTSP streaming (stream name), string: **""** - no suffix. |
 | metadataSuffix  | Metadata suffix (stream name), string: **""** - no suffix. This parameter is used if the metadata is the separate stream in RTSP. |
 | minBitrateKbps  | Minimum bitrate for variable bitrate mode, integer kbps. |
@@ -872,7 +893,7 @@ public:
 
 ## Serialize video streamer parameters
 
-The **VStreamerParams** class provides a method **serialize(...)** to serialize video streamer parameters (fields of the [VStreamerParams](#vstreamerparams-class-description) class). Serialization of video streamer parameters is necessary when you need to send video streamer parameters via communication channels. The method provides options to exclude particular parameters from serialization. To do this, the method inserts a binary mask (7 bytes) where each bit represents a particular parameter and the **deserialize(...)** method recognizes it. Method declaration:
+The **VStreamerParams** class provides a method **serialize(...)** to serialize video streamer parameters (fields of the [VStreamerParams](#vstreamerparams-class-description) class). Serialization of video streamer parameters is necessary when you need to send video streamer parameters via communication channels. The method provides options to exclude particular parameters from serialization. To do this, the method inserts a binary mask (8 bytes) where each bit represents a particular parameter and the **deserialize(...)** method recognizes it. Method declaration:
 
 ```cpp
 bool serialize(uint8_t* data, int bufferSize, int& size, VStreamerParamsMask* mask = nullptr);
@@ -960,7 +981,7 @@ Example without parameters mask:
 // Prepare random params.
 VStreamerParams in;
 in.directStreamIp = "alsfghljb";
-in.port = 0;
+in.directStreamPort = 0;
 
 // Serislize parameters.
 uint8_t data[1024];
@@ -975,11 +996,11 @@ Example with parameters mask:
 // Prepare random parameters.
 VStreamerParams in;
 in.directStreamIp = "alsfghljb";
-in.port = 0;
+in.directStreamPort = 0;
 
 // Prepare parameters mask.
 VStreamerParamsMask mask;
-mask.port = false; // Exclude port. Others by default.
+mask.directStreamPort = false; // Exclude directStreamPort. Others by default.
 
 // Encode parameters.
 uint8_t data[1024];
@@ -1057,8 +1078,11 @@ if(!outConfig.readFromFile("TestVStreamerParams.json"))
         "custom2": 30513.0,
         "custom3": 16213.0,
         "directStreamBitrateKbps": 5000,
+        "directStreamEnable": true,
+        "directStreamIp": "sfspfo9jbjnbjhklvllks",
         "directStreamMaxPayloadSize": 1472,
         "directStreamPacingMode": 0,
+        "directStreamPort": 31062,
         "directStreamType": 1,
         "enable": false,
         "fitMode": 14594,
@@ -1071,7 +1095,6 @@ if(!outConfig.readFromFile("TestVStreamerParams.json"))
         "hlsEncryption": "wieufjpowkf",
         "hlsKey": "wqlovf;qb",
         "hlsPort": 9365,
-        "directStreamIp": "sfspfo9jbjnbjhklvllks",
         "jpegQuality": 22605,
         "klvMode": 0,
         "logLevel": 0,
@@ -1088,8 +1111,6 @@ if(!outConfig.readFromFile("TestVStreamerParams.json"))
         "rtmpKey": "dkkkkjfkjdkjfkj2134",
         "rtmpPort": 55981,
         "rtmpsPort": 1936,
-        "directStreamEnable": true,
-        "directStreamPort": 31062,
         "rtspCert": "lkjrkjg",
         "rtspEnable": true,
         "rtspEncryption": "quyen",
@@ -1097,8 +1118,8 @@ if(!outConfig.readFromFile("TestVStreamerParams.json"))
         "rtspMulticastIp": "wpofuihifo",
         "rtspMulticastPort": 47135,
         "rtspPort": 42745,
-        "serverStreamType": 0,
         "rtspsPort": 56847,
+        "serverStreamType": 0,
         "srtEnable": true,
         "srtPort": 1963,
         "suffix": "pisfhcowmfv",
