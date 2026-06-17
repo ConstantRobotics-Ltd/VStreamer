@@ -31,7 +31,7 @@ string VStreamer::getVersion()
 bool VStreamerParams::serialize(uint8_t *data, int bufferSize, int &size, VStreamerParamsMask *mask)
 {
     // Check buffer size.
-    if (bufferSize < 12) // Header (12 bytes) + one bool parameter.
+    if (bufferSize < 12) // Header (11 bytes) + one bool parameter (1 byte).
     {
         size = 0;
         return false;
@@ -443,10 +443,10 @@ bool VStreamerParams::serialize(uint8_t *data, int bufferSize, int &size, VStrea
         data[9] |= (1 << 1);
     }
 
-    if (mask->directStreamType && (bufferSize > pos + sizeof(int)))
+    if (mask->directStreamType && (bufferSize > pos + directStreamType.size() + 1))
     {
-        memcpy(&data[pos], &directStreamType, sizeof(int));
-        pos += sizeof(int);
+        memcpy(&data[pos], directStreamType.c_str(), directStreamType.size() + 1);
+        pos += directStreamType.size() + 1;
         data[9] |= (1 << 0);
     }
 
@@ -471,10 +471,10 @@ bool VStreamerParams::serialize(uint8_t *data, int bufferSize, int &size, VStrea
         data[10] |= (1 << 5);
     }
 
-    if (mask->serverStreamType && (bufferSize > pos + sizeof(int)))
+    if (mask->serverStreamType && (bufferSize > pos + serverStreamType.size() + 1))
     {
-        memcpy(&data[pos], &serverStreamType, sizeof(int));
-        pos += sizeof(int);
+        memcpy(&data[pos], serverStreamType.c_str(), serverStreamType.size() + 1);
+        pos += serverStreamType.size() + 1;
         data[10] |= (1 << 4);
     }
 
@@ -487,6 +487,25 @@ bool VStreamerParams::serialize(uint8_t *data, int bufferSize, int &size, VStrea
 
     size = pos;
 
+    return true;
+}
+
+
+
+// Read a null-terminated string from the buffer with bounds checking.
+// Advances pos past the terminator. Returns false if no terminator is found
+// within [pos, dataSize) (protects against out-of-bounds reads and overflow).
+static bool readString(const uint8_t* data, int dataSize, int& pos, std::string& out)
+{
+    if (pos < 0 || pos >= dataSize)
+        return false;
+    int remaining = dataSize - pos;
+    const void* nullPos = memchr(&data[pos], 0, (size_t)remaining);
+    if (nullPos == nullptr)
+        return false; // No null terminator within the buffer bounds.
+    size_t length = (const uint8_t*)nullPos - &data[pos];
+    out.assign((const char*)&data[pos], length);
+    pos += (int)length + 1;
     return true;
 }
 
@@ -505,9 +524,6 @@ bool VStreamerParams::deserialize(uint8_t *data, int dataSize)
     // Decode version.
     if (data[1] != VSTREAMER_MAJOR_VERSION || data[2] != VSTREAMER_MINOR_VERSION)
         return false;
-
-    // Array for string conversion.
-    char strArray[512];
 
     // Start of actual data.
     int pos = 11;
@@ -550,10 +566,8 @@ bool VStreamerParams::deserialize(uint8_t *data, int dataSize)
 
     if (checkBit(data[3], 4))
     {
-        memset(strArray, 0, 512);
-        strcpy(strArray, (char *)&data[pos]);
-        pos += strlen(strArray) + 1;
-        directStreamIp = strArray;
+        if (!readString(data, dataSize, pos, directStreamIp))
+            return false;
     }
     else
     {
@@ -730,10 +744,8 @@ bool VStreamerParams::deserialize(uint8_t *data, int dataSize)
 
     if (checkBit(data[5], 5))
     {
-        memset(strArray, 0, 512);
-        strcpy(strArray, (char *)&data[pos]);
-        pos += strlen(strArray) + 1;
-        rtspMulticastIp = strArray;
+        if (!readString(data, dataSize, pos, rtspMulticastIp))
+            return false;
     }
     else
     {
@@ -754,10 +766,8 @@ bool VStreamerParams::deserialize(uint8_t *data, int dataSize)
 
     if (checkBit(data[5], 3))
     {
-        memset(strArray, 0, 512);
-        strcpy(strArray, (char *)&data[pos]);
-        pos += strlen(strArray) + 1;
-        user = strArray;
+        if (!readString(data, dataSize, pos, user))
+            return false;
     }
     else
     {
@@ -766,10 +776,8 @@ bool VStreamerParams::deserialize(uint8_t *data, int dataSize)
 
     if (checkBit(data[5], 2))
     {
-        memset(strArray, 0, 512);
-        strcpy(strArray, (char *)&data[pos]);
-        pos += strlen(strArray) + 1;
-        password = strArray;
+        if (!readString(data, dataSize, pos, password))
+            return false;
     }
     else
     {
@@ -778,10 +786,8 @@ bool VStreamerParams::deserialize(uint8_t *data, int dataSize)
 
     if (checkBit(data[5], 1))
     {
-        memset(strArray, 0, 512);
-        strcpy(strArray, (char *)&data[pos]);
-        pos += strlen(strArray) + 1;
-        suffix = strArray;
+        if (!readString(data, dataSize, pos, suffix))
+            return false;
     }
     else
     {
@@ -790,10 +796,8 @@ bool VStreamerParams::deserialize(uint8_t *data, int dataSize)
 
     if (checkBit(data[5], 0))
     {
-        memset(strArray, 0, 512);
-        strcpy(strArray, (char *)&data[pos]);
-        pos += strlen(strArray) + 1;
-        metadataSuffix = strArray;
+        if (!readString(data, dataSize, pos, metadataSuffix))
+            return false;
     }
     else
     {
@@ -898,10 +902,8 @@ bool VStreamerParams::deserialize(uint8_t *data, int dataSize)
 
     if (checkBit(data[7], 7))
     {
-        memset(strArray, 0, 512);
-        strcpy(strArray, (char *)&data[pos]);
-        pos += strlen(strArray) + 1;
-        codec = strArray;
+        if (!readString(data, dataSize, pos, codec))
+            return false;
     }
     else
     {
@@ -994,10 +996,8 @@ bool VStreamerParams::deserialize(uint8_t *data, int dataSize)
 
     if (checkBit(data[8], 7))
     {
-        memset(strArray, 0, 512);
-        strcpy(strArray, (char *)&data[pos]);
-        pos += strlen(strArray) + 1;
-        rtspKey = strArray;
+        if (!readString(data, dataSize, pos, rtspKey))
+            return false;
     }
     else
     {
@@ -1006,10 +1006,8 @@ bool VStreamerParams::deserialize(uint8_t *data, int dataSize)
 
     if (checkBit(data[8], 6))
     {
-        memset(strArray, 0, 512);
-        strcpy(strArray, (char *)&data[pos]);
-        pos += strlen(strArray) + 1;
-        rtspCert = strArray;
+        if (!readString(data, dataSize, pos, rtspCert))
+            return false;
     }
     else
     {
@@ -1018,10 +1016,8 @@ bool VStreamerParams::deserialize(uint8_t *data, int dataSize)
 
     if (checkBit(data[8], 5))
     {
-        memset(strArray, 0, 512);
-        strcpy(strArray, (char *)&data[pos]);
-        pos += strlen(strArray) + 1;
-        webRtcKey = strArray;
+        if (!readString(data, dataSize, pos, webRtcKey))
+            return false;
     }
     else
     {
@@ -1030,10 +1026,8 @@ bool VStreamerParams::deserialize(uint8_t *data, int dataSize)
 
     if (checkBit(data[8], 4))
     {
-        memset(strArray, 0, 512);
-        strcpy(strArray, (char *)&data[pos]);
-        pos += strlen(strArray) + 1;
-        webRtcCert = strArray;
+        if (!readString(data, dataSize, pos, webRtcCert))
+            return false;
     }
     else
     {
@@ -1042,10 +1036,8 @@ bool VStreamerParams::deserialize(uint8_t *data, int dataSize)
 
     if (checkBit(data[8], 3))
     {
-        memset(strArray, 0, 512);
-        strcpy(strArray, (char *)&data[pos]);
-        pos += strlen(strArray) + 1;
-        hlsKey = strArray;
+        if (!readString(data, dataSize, pos, hlsKey))
+            return false;
     }
     else
     {
@@ -1054,10 +1046,8 @@ bool VStreamerParams::deserialize(uint8_t *data, int dataSize)
 
     if (checkBit(data[8], 2))
     {
-        memset(strArray, 0, 512);
-        strcpy(strArray, (char *)&data[pos]);
-        pos += strlen(strArray) + 1;
-        hlsCert = strArray;
+        if (!readString(data, dataSize, pos, hlsCert))
+            return false;
     }
     else
     {
@@ -1066,10 +1056,8 @@ bool VStreamerParams::deserialize(uint8_t *data, int dataSize)
 
     if (checkBit(data[8], 1))
     {
-        memset(strArray, 0, 512);
-        strcpy(strArray, (char *)&data[pos]);
-        pos += strlen(strArray) + 1;
-        rtmpKey = strArray;
+        if (!readString(data, dataSize, pos, rtmpKey))
+            return false;
     }
     else
     {
@@ -1078,10 +1066,8 @@ bool VStreamerParams::deserialize(uint8_t *data, int dataSize)
 
     if (checkBit(data[8], 0))
     {
-        memset(strArray, 0, 512);
-        strcpy(strArray, (char *)&data[pos]);
-        pos += strlen(strArray) + 1;
-        rtmpCert = strArray;
+        if (!readString(data, dataSize, pos, rtmpCert))
+            return false;
     }
     else
     {
@@ -1090,10 +1076,8 @@ bool VStreamerParams::deserialize(uint8_t *data, int dataSize)
 
     if (checkBit(data[9], 7))
     {
-        memset(strArray, 0, 512);
-        strcpy(strArray, (char *)&data[pos]);
-        pos += strlen(strArray) + 1;
-        rtspEncryption = strArray;
+        if (!readString(data, dataSize, pos, rtspEncryption))
+            return false;
     }
     else
     {
@@ -1102,10 +1086,8 @@ bool VStreamerParams::deserialize(uint8_t *data, int dataSize)
 
     if (checkBit(data[9], 6))
     {
-        memset(strArray, 0, 512);
-        strcpy(strArray, (char *)&data[pos]);
-        pos += strlen(strArray) + 1;
-        webRtcEncryption = strArray;
+        if (!readString(data, dataSize, pos, webRtcEncryption))
+            return false;
     }
     else
     {
@@ -1114,10 +1096,8 @@ bool VStreamerParams::deserialize(uint8_t *data, int dataSize)
 
     if (checkBit(data[9], 5))
     {
-        memset(strArray, 0, 512);
-        strcpy(strArray, (char *)&data[pos]);
-        pos += strlen(strArray) + 1;
-        rtmpEncryption = strArray;
+        if (!readString(data, dataSize, pos, rtmpEncryption))
+            return false;
     }
     else
     {
@@ -1126,10 +1106,8 @@ bool VStreamerParams::deserialize(uint8_t *data, int dataSize)
 
     if (checkBit(data[9], 4))
     {
-        memset(strArray, 0, 512);
-        strcpy(strArray, (char *)&data[pos]);
-        pos += strlen(strArray) + 1;
-        hlsEncryption = strArray;
+        if (!readString(data, dataSize, pos, hlsEncryption))
+            return false;
     }
     else
     {
@@ -1174,14 +1152,12 @@ bool VStreamerParams::deserialize(uint8_t *data, int dataSize)
 
     if (checkBit(data[9], 0))
     {
-        if (dataSize < pos + sizeof(int))
+        if (!readString(data, dataSize, pos, directStreamType))
             return false;
-        memcpy(&directStreamType, &data[pos], sizeof(int));
-        pos += sizeof(int);
     }
     else
     {
-        directStreamType = 0;
+        directStreamType = "";
     }
 
     if (checkBit(data[10], 7))
@@ -1222,14 +1198,12 @@ bool VStreamerParams::deserialize(uint8_t *data, int dataSize)
 
     if (checkBit(data[10], 4))
     {
-        if (dataSize < pos + sizeof(int))
+        if (!readString(data, dataSize, pos, serverStreamType))
             return false;
-        memcpy(&serverStreamType, &data[pos], sizeof(int));
-        pos += sizeof(int);
     }
     else
     {
-        serverStreamType = 0;
+        serverStreamType = "";
     }
 
     if (checkBit(data[10], 3))

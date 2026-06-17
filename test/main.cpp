@@ -23,7 +23,7 @@ void fillRandomData(VStreamerParams &a)
     a.hlsPort = rand() % 65535 + 1;
     a.srtPort = rand() % 65535 + 1;
     a.rtmpPort = rand() % 65535 + 1;
-    a.rtspsPort = rand() % 65535 + 1;
+    a.rtmpsPort = rand() % 65535 + 1;
     a.metadataPort = rand() % 65535 + 1;
     a.rtspEnable = true;
     a.directStreamEnable = true;
@@ -67,11 +67,13 @@ void fillRandomData(VStreamerParams &a)
     a.rtmpEncryption = "skldfjdf";
     a.hlsEncryption = "wieufjpowkf";
     a.logLevel = rand() % 4;
-    a.directStreamType = rand() % 3;
+    const std::string directStreamTypes[] = {"rtp", "mpegts", "mpegts-rtp"};
+    a.directStreamType = directStreamTypes[rand() % 3];
     a.directStreamBitrateKbps = rand() % 65535 + 1;
     a.directStreamMaxPayloadSize = rand() % 65535 + 1;
     a.directStreamPacingMode = rand() % 2;
-    a.serverStreamType = rand() % 2;
+    const std::string serverStreamTypes[] = {"rtp", "mpegts"};
+    a.serverStreamType = serverStreamTypes[rand() % 2];
     a.klvMode = rand() % 2;
 }
 
@@ -523,7 +525,7 @@ bool encodeDecodeCommandsTest()
         return false;
     }
 
-    // Checkk ID and value.
+    // Check ID and value.
     if (commandId != VStreamerCommand::RESTART)
     {
         cout << "not a VStreamerCommand::RESTART" << endl;
@@ -543,7 +545,7 @@ bool encodeDecodeCommandsTest()
         return false;
     }
 
-    // Checkk ID and value.
+    // Check ID and value.
     if (paramId != VStreamerParam::WIDTH)
     {
         cout << "not a VStreamerParam::WIDTH" << endl;

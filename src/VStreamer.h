@@ -200,11 +200,11 @@ public:
     /// 2 - Only terminal, 3 - File and terminal.
     int logLevel{0};
     /// Transport/type of the direct stream (point-to-point to
-    /// directStreamIp:directStreamPort, bypassing MediaMTX), integer index:
-    /// 0 - rtp (codec RTP), 1 - mpegts (MPEG-TS over UDP, MISB ST 1402),
-    /// 2 - mpegts-rtp (MPEG-TS over RTP, MISB ST 1403). 1/2 carry KLV per
-    /// STANAG 4609. JPEG supports 0 (rtp) only.
-    int directStreamType{0};
+    /// directStreamIp:directStreamPort, bypassing MediaMTX), string:
+    /// "rtp" (codec RTP), "mpegts" (MPEG-TS over UDP, MISB ST 1402),
+    /// "mpegts-rtp" (MPEG-TS over RTP, MISB ST 1403). mpegts/mpegts-rtp carry
+    /// KLV per STANAG 4609. JPEG supports "rtp" only.
+    std::string directStreamType{"rtp"};
     /// Target sending bitrate for the direct stream, integer kbps (>= 0).
     /// Used as the pacer target when directStreamPacingMode == 0.
     int directStreamBitrateKbps{5000};
@@ -219,18 +219,19 @@ public:
     int directStreamPacingMode{0};
     /// Transport/type of the server-delivered stream — the stream fed to
     /// the media server, which then fans it out to clients (RTSP / SRT /
-    /// HLS / RTMP / WebRTC). Integer index: 0 - rtp (codec-RTP + SDP, KLV
-    /// muxed as a metadata track), 1 - mpegts (STANAG 4609 MPEG-TS over UDP;
+    /// HLS / RTMP / WebRTC). String: "rtp" (codec-RTP + SDP, KLV
+    /// muxed as a metadata track), "mpegts" (STANAG 4609 MPEG-TS over UDP;
     /// the server demuxes the KLV PID and re-serves it as a native KLV
     /// track). Both preserve KLV. The concrete media server is an
     /// implementation detail (MediaMTX in VStreamerMediaMtx).
     /// NOTE: distinct from rtspEnable (RTSP protocol enable/disable).
-    int serverStreamType{0};
+    std::string serverStreamType{"rtp"};
     /// KLV signalling for the MPEG-TS paths (direct mpegts/mpegts-rtp and
-    /// the loopback when serverStreamType == 1), integer: 0 - asynchronous
+    /// the loopback when serverStreamType == "mpegts"), integer: 0 - asynchronous
     /// (stream_type 0x06 + "KLVA" registration, raw KLV), 1 - synchronous
-    /// (stream_type 0x15 + metadata_descriptor, KLV in a metadata_AU_cell).
-    /// MISB ST 0604; ignored for the rtp transport. Default 0 (widest
+    /// (stream_type 0x15 + metadata_descriptor + metadata_std_descriptor, KLV
+    /// in a metadata_AU_cell). MISB ST 0604; ignored for the rtp transport.
+    /// Default 0 (widest
     /// receiver compatibility).
     int klvMode{0};
 
@@ -249,7 +250,9 @@ public:
 
     /**
      * @brief Serialize parameters.
-     * @param data Pointer to data buffer. Must have at least 128 bytes size.
+     * @param data Pointer to data buffer. Must be at least 12 bytes (header
+     *             plus one bool field); if smaller than the size required for
+     *             all selected parameters, fewer parameters are serialized.
      * @param bufferSize Size of data buffer.
      * @param size Size of data.
      * @param mask Pointer to parameters mask.
@@ -385,7 +388,7 @@ enum class VStreamerParam
     /// Logging mode. Values: 0 - Disable, 1 - Only file,
     /// 2 - Only terminal, 3 - File and terminal.
     LOG_LEVEL,
-    /// Direct stream transport/type, integer: 0 - rtp, 1 - mpegts, 2 - mpegts-rtp.
+    /// Direct stream transport/type, string: "rtp", "mpegts", "mpegts-rtp".
     DIRECT_STREAM_TYPE,
     /// Direct stream target bitrate, integer kbps (>= 0).
     DIRECT_STREAM_BITRATE_KBPS,
@@ -393,13 +396,14 @@ enum class VStreamerParam
     DIRECT_STREAM_MAX_PAYLOAD,
     /// Direct stream pacing mode, integer: 0 - target bitrate, 1 - back-pressure.
     DIRECT_STREAM_PACING_MODE,
-    /// Server-delivered stream type, integer: 0 - rtp (codec-RTP + SDP),
-    /// 1 - mpegts (STANAG 4609 MPEG-TS; the media server re-serves KLV
+    /// Server-delivered stream type, string: "rtp" (codec-RTP + SDP),
+    /// "mpegts" (STANAG 4609 MPEG-TS; the media server re-serves KLV
     /// natively). Distinct from RTSP_MODE (RTSP protocol enable/disable).
     SERVER_STREAM_TYPE,
     /// KLV signalling for MPEG-TS paths, integer: 0 - asynchronous
     /// (stream_type 0x06 + "KLVA"), 1 - synchronous (stream_type 0x15 +
-    /// metadata_descriptor + metadata_AU_cell). MISB ST 0604.
+    /// metadata_descriptor + metadata_std_descriptor, KLV in a
+    /// metadata_AU_cell). MISB ST 0604.
     KLV_MODE
 };
 
@@ -520,17 +524,19 @@ public:
 
     /**
      * @brief Encode set parameter command.
-     * @param data Pointer to data buffer. Must have size >= 11.
+     * @param data Pointer to data buffer. Must have size >= 8 + value.size()
+     *             (3-byte header + 4-byte param ID + the string and its null
+     *             terminator).
      * @param size Size of encoded data.
      * @param id Parameter ID.
      * @param value Parameter value.
      */
-    static void encodeSetParamCommand(uint8_t* data, int& size, 
+    static void encodeSetParamCommand(uint8_t* data, int& size,
                                         VStreamerParam id, std::string value);
 
     /**
      * @brief Encode command.
-     * @param data Pointer to data buffer. Must have size >= 11.
+     * @param data Pointer to data buffer. Must have size >= 7.
      * @param size Size of encoded data.
      * @param id Command ID.
      */
