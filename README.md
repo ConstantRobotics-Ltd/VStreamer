@@ -4,7 +4,7 @@
 
 # **VStreamer interface C++ library**
 
-**v3.0.0**
+**v3.1.0**
 
 
 
@@ -62,6 +62,7 @@ The **VStreamer** C++ library provides a standard interface and defines data str
 | 2.1.0   | 15.06.2026   | - New **directStreamType** parameter to select the direct stream transport/type. |
 | 2.2.0   | 16.06.2026   | - **Breaking serialize/deserialize change** (8th parameter-mask byte added, strict major.minor version gate): producers and consumers must be rebuilt in lockstep.<br/>- New direct-stream parameters: **directStreamBitrateKbps**, **directStreamMaxPayloadSize**, **directStreamPacingMode**.<br/>- New **serverStreamType** (server-delivered stream type). |
 | 3.0.0   | 17.06.2026   | - **Breaking parameter rename** for a clear two-leg model: `ip`→**directStreamIp**, `rtpPort`→**directStreamPort**, `rtpEnable`→**directStreamEnable**; `rtspStreamMode`→**serverStreamType**. Direct-stream params keep the `directStream*` prefix.<br/>- **directStreamType** and **serverStreamType** are **string** values whose accepted set is implementation-defined (each concrete video streamer defines the values and their meaning, including whether KLV metadata is carried; for example `"rtp"`, `"mpegts"`).<br/>- The direct stream is transport-agnostic (its own IP/port, not RTP-specific). |
+| 3.1.0   | 18.06.2026   | - Removed **KlvMode** parameter. |
 
 
 
