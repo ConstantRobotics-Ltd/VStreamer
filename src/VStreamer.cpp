@@ -478,13 +478,6 @@ bool VStreamerParams::serialize(uint8_t *data, int bufferSize, int &size, VStrea
         data[10] |= (1 << 4);
     }
 
-    if (mask->klvMode && (bufferSize > pos + sizeof(int)))
-    {
-        memcpy(&data[pos], &klvMode, sizeof(int));
-        pos += sizeof(int);
-        data[10] |= (1 << 3);
-    }
-
     size = pos;
 
     return true;
@@ -1204,18 +1197,6 @@ bool VStreamerParams::deserialize(uint8_t *data, int dataSize)
     else
     {
         serverStreamType = "";
-    }
-
-    if (checkBit(data[10], 3))
-    {
-        if (dataSize < pos + sizeof(int))
-            return false;
-        memcpy(&klvMode, &data[pos], sizeof(int));
-        pos += sizeof(int);
-    }
-    else
-    {
-        klvMode = 0;
     }
 
     return true;

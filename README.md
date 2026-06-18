@@ -59,9 +59,9 @@ The **VStreamer** C++ library provides a standard interface and defines data str
 | 1.1.3   | 10.07.2024   | - Submodules updated.<br />- CMake updated. |
 | 1.1.4   | 31.10.2024   | - Updated VCodec interface.    |
 | 2.0.0   | 01.11.2025   | - Updated VStreamer interface to support new video servers. |
-| 2.1.0   | 15.06.2026   | - New **directStreamType** parameter to select direct stream transport: RTP, MPEG-TS (STANAG 4609) or MPEG-TS over RTP. |
-| 2.2.0   | 16.06.2026   | - **Breaking serialize/deserialize change** (8th parameter-mask byte added, strict major.minor version gate): producers and consumers must be rebuilt in lockstep.<br/>- **directStreamType** changed from string to integer index (0 - rtp, 1 - mpegts, 2 - mpegts-rtp), consistent with bitrateMode/h264Profile/fitMode.<br/>- New direct-stream parameters: **directStreamBitrateKbps**, **directStreamMaxPayloadSize**, **directStreamPacingMode**.<br/>- New **serverStreamType** (server-delivered stream type: 0 - rtp, 1 - mpegts) and **klvMode** (KLV signalling: 0 - asynchronous, 1 - synchronous, MISB ST 0604). |
-| 3.0.0   | 17.06.2026   | - **Breaking parameter rename** for a clear two-leg model: `ip`→**directStreamIp**, `rtpPort`→**directStreamPort**, `rtpEnable`→**directStreamEnable**; `rtspStreamMode`→**serverStreamType**. Direct-stream params keep the `directStream*` prefix.<br/>- **directStreamType** and **serverStreamType** are now **string** values (`"rtp"`, `"mpegts"`, `"mpegts-rtp"` for directStreamType; `"rtp"`, `"mpegts"` for serverStreamType) instead of integer indices, consistent with the `codec` parameter.<br/>- The direct stream is now transport-agnostic (its own IP/port, not RTP-specific). JSON value types, the `VStreamerParam` enum names, and the binary serialize encoding of these two fields change — update configs/callers in lockstep. |
+| 2.1.0   | 15.06.2026   | - New **directStreamType** parameter to select the direct stream transport/type. |
+| 2.2.0   | 16.06.2026   | - **Breaking serialize/deserialize change** (8th parameter-mask byte added, strict major.minor version gate): producers and consumers must be rebuilt in lockstep.<br/>- New direct-stream parameters: **directStreamBitrateKbps**, **directStreamMaxPayloadSize**, **directStreamPacingMode**.<br/>- New **serverStreamType** (server-delivered stream type). |
+| 3.0.0   | 17.06.2026   | - **Breaking parameter rename** for a clear two-leg model: `ip`→**directStreamIp**, `rtpPort`→**directStreamPort**, `rtpEnable`→**directStreamEnable**; `rtspStreamMode`→**serverStreamType**. Direct-stream params keep the `directStream*` prefix.<br/>- **directStreamType** and **serverStreamType** are **string** values whose accepted set is implementation-defined (each concrete video streamer defines the values and their meaning, including whether KLV metadata is carried; for example `"rtp"`, `"mpegts"`).<br/>- The direct stream is transport-agnostic (its own IP/port, not RTP-specific). |
 
 
 
@@ -559,22 +559,20 @@ enum class VStreamerParam
     /// Logging mode. Values: 0 - Disable, 1 - Only file,
     /// 2 - Only terminal, 3 - File and terminal.
     LOG_LEVEL,
-    /// Direct stream transport/type, string: "rtp", "mpegts", "mpegts-rtp".
+    /// Direct stream transport/type, string. Accepted values are
+    /// implementation-defined (e.g. "rtp", "mpegts"); the value also decides
+    /// whether KLV metadata is carried.
     DIRECT_STREAM_TYPE,
-    /// Direct stream target bitrate, integer kbps (>= 0).
+    /// Direct stream target bitrate, integer kbps.
     DIRECT_STREAM_BITRATE_KBPS,
-    /// Direct stream max UDP/RTP payload size, integer bytes [256:65535].
+    /// Direct stream max UDP/RTP payload size, integer bytes.
     DIRECT_STREAM_MAX_PAYLOAD,
-    /// Direct stream pacing mode, integer: 0 - target bitrate, 1 - back-pressure.
+    /// Direct stream pacing mode, integer: 0 - target bitrate, 1 - push.
     DIRECT_STREAM_PACING_MODE,
-    /// Server-delivered stream type, string: "rtp" (codec-RTP + SDP),
-    /// "mpegts" (STANAG 4609 MPEG-TS; the media server re-serves KLV
-    /// natively). Distinct from RTSP_MODE (RTSP protocol enable/disable).
-    SERVER_STREAM_TYPE,
-    /// KLV signalling for MPEG-TS paths, integer: 0 - asynchronous
-    /// (stream_type 0x06 + "KLVA"), 1 - synchronous (stream_type 0x15 +
-    /// metadata_descriptor + metadata_AU_cell). MISB ST 0604.
-    KLV_MODE
+    /// Server-delivered stream type, string. Accepted values are
+    /// implementation-defined (e.g. "rtp", "mpegts"); the value also decides
+    /// whether KLV metadata is carried. Distinct from RTSP_MODE (protocol on/off).
+    SERVER_STREAM_TYPE
 };
 ```
 
@@ -637,12 +635,11 @@ enum class VStreamerParam
 | RTMP_ENCRYPTION  | RTMP encryption type, string: **""** or **"no"**, **"strict"**, **"optional"**. |
 | HLS_ENCRYPTION   | HLS encryption type, string: **""** or **"no"**, **"yes"**. |
 | LOG_LEVEL        | Logging mode. Values: **0** - Disable, **1** - Only file, **2** - Only terminal, **3** - File and terminal. |
-| DIRECT_STREAM_TYPE | Transport/type of the direct (user-facing) stream, string: **"rtp"** (default, codec RTP), **"mpegts"** (MPEG-TS over UDP, MISB ST 1402 / STANAG 4609), **"mpegts-rtp"** (MPEG-TS over RTP, MISB ST 1403). With **"mpegts"** / **"mpegts-rtp"** the stream carries KLV metadata per STANAG 4609. **JPEG** supports **"rtp"** only. The particular values depend on implementation. |
-| DIRECT_STREAM_BITRATE_KBPS | Target sending bitrate for the direct stream, integer kbps (**>= 0**). Used as the pacer target when **DIRECT_STREAM_PACING_MODE** is **0**. |
-| DIRECT_STREAM_MAX_PAYLOAD | Maximum UDP/RTP payload size for the direct stream, integer bytes **[256:65535]**. Keep **~1420** (MTU 1500) for normal use; large values are for **localhost / trusted LAN** only. Applies to the rtp / mpegts-rtp transports. |
-| DIRECT_STREAM_PACING_MODE | Pacing mode of the direct stream, integer: **0** - target bitrate (token-bucket, uses **DIRECT_STREAM_BITRATE_KBPS**), **1** - back-pressure (kernel send-buffer occupancy). |
-| SERVER_STREAM_TYPE | Transport/type of the **server-delivered** stream — fed to the media server, which fans it out to clients (RTSP/SRT/HLS/RTMP/WebRTC). String: **"rtp"** (codec-RTP + SDP, KLV muxed as a metadata track), **"mpegts"** (STANAG 4609 MPEG-TS; the server demuxes the KLV PID and re-serves it as a native KLV track). Distinct from **RTSP_MODE** (RTSP protocol enable/disable). The particular values depend on implementation. |
-| KLV_MODE | KLV signalling for the MPEG-TS paths (direct mpegts/mpegts-rtp and the mpegts loopback), integer: **0** - asynchronous (stream_type 0x06 + "KLVA" registration, raw KLV), **1** - synchronous (stream_type 0x15 + metadata_descriptor + metadata_std_descriptor, KLV in a metadata_AU_cell). MISB ST 0604. Ignored for the rtp transport. |
+| DIRECT_STREAM_TYPE | Transport/type of the direct (point-to-point) stream, string. The accepted values are **implementation-defined**: the abstract **VStreamer** interface does not fix them — each concrete video-streamer implementation defines the value set and the meaning of each value, **including whether KLV metadata is carried** (there is no separate KLV flag). Example values: **"rtp"**, **"mpegts"** (and others, depending on implementation). Default **"rtp"**. |
+| DIRECT_STREAM_BITRATE_KBPS | Target sending bitrate for the direct stream, integer kbps. Used as the pacer target when **DIRECT_STREAM_PACING_MODE** is **0**. |
+| DIRECT_STREAM_MAX_PAYLOAD | Maximum UDP/RTP payload size for the direct stream, integer bytes. |
+| DIRECT_STREAM_PACING_MODE | Pacing mode of the direct stream, integer: **0** - target bitrate, **1** - push. |
+| SERVER_STREAM_TYPE | Transport/type of the **server-delivered** stream — fed to the media server, which fans it out to clients. String whose accepted values are **implementation-defined**: the abstract **VStreamer** interface does not fix them — each concrete video-streamer implementation defines the value set and the meaning of each value, **including whether KLV metadata is carried** (there is no separate KLV flag). Example values: **"rtp"**, **"mpegts"** (and others, depending on implementation). Distinct from **RTSP_MODE** (protocol enable/disable). Default **"rtp"**. |
 
 
 
@@ -769,30 +766,23 @@ public:
     /// Logging mode. Values: 0 - Disable, 1 - Only file,
     /// 2 - Only terminal, 3 - File and terminal.
     int logLevel{0};
-    /// Transport of the direct (user-facing) stream, string:
-    /// "rtp", "mpegts" (MISB ST 1402), "mpegts-rtp" (MISB ST 1403).
-    /// mpegts/mpegts-rtp carry KLV per STANAG 4609. JPEG supports "rtp" only.
+    /// Transport/type of the direct (point-to-point) stream. String whose
+    /// accepted values are IMPLEMENTATION-DEFINED — each concrete VStreamer
+    /// decides the set and what each value means, including whether KLV
+    /// metadata is carried (no separate flag). Examples: "rtp", "mpegts".
     std::string directStreamType{"rtp"};
-    /// Target sending bitrate for the direct stream, integer kbps (>= 0).
-    /// Used as the pacer target when directStreamPacingMode == 0.
+    /// Target sending bitrate for the direct stream, integer kbps.
     int directStreamBitrateKbps{5000};
-    /// Maximum UDP/RTP payload size for the direct stream, integer bytes
-    /// [256:65535]. Keep ~1420 for normal use; large values are for
-    /// localhost / trusted LAN only.
+    /// Maximum UDP/RTP payload size for the direct stream, integer bytes.
     int directStreamMaxPayloadSize{1472};
-    /// Pacing mode of the direct stream, integer: 0 - target bitrate
-    /// (token-bucket), 1 - back-pressure (kernel send-buffer occupancy).
+    /// Pacing mode of the direct stream, integer: 0 - target bitrate, 1 - push.
     int directStreamPacingMode{0};
-    /// Transport/type of the server-delivered stream (fed to the media
-    /// server, which fans it out to clients), string: "rtp" (codec-RTP +
-    /// SDP, KLV as a metadata track), "mpegts" (STANAG 4609; the server
-    /// re-serves KLV as a native track).
-    /// Distinct from rtspEnable (RTSP protocol enable/disable).
+    /// Transport/type of the server-delivered stream (fed to the media server,
+    /// which fans it out to clients). String whose accepted values are
+    /// IMPLEMENTATION-DEFINED — each concrete VStreamer decides the set and what
+    /// each value means, including whether KLV metadata is carried (no separate
+    /// flag). Examples: "rtp", "mpegts". Distinct from rtspEnable (protocol on/off).
     std::string serverStreamType{"rtp"};
-    /// KLV signalling for the MPEG-TS paths, integer: 0 - asynchronous
-    /// (stream_type 0x06 + "KLVA"), 1 - synchronous (stream_type 0x15 +
-    /// metadata_descriptor, KLV in a metadata_AU_cell). MISB ST 0604.
-    int klvMode{0};
 
     JSON_READABLE(VStreamerParams, enable, width, height, directStreamIp, rtspPort, rtspsPort, directStreamPort,
                   webRtcPort, hlsPort, srtPort, rtmpPort, rtmpsPort, metadataPort,
@@ -805,7 +795,7 @@ public:
                   hlsKey, hlsCert, rtmpKey, rtmpCert, rtspEncryption,
                   webRtcEncryption, rtmpEncryption, hlsEncryption, logLevel,
                   directStreamType, directStreamBitrateKbps, directStreamMaxPayloadSize,
-                  directStreamPacingMode, serverStreamType, klvMode)
+                  directStreamPacingMode, serverStreamType)
 
     /// Serialize parameters.
     bool serialize(uint8_t* data, int bufferSize, int& size,
@@ -820,7 +810,7 @@ public:
 
 - **Direct stream** (point-to-point to a single destination): `directStreamEnable`, `directStreamIp`, `directStreamPort`, `directStreamType`, `directStreamBitrateKbps`, `directStreamMaxPayloadSize`, `directStreamPacingMode`.
 - **Server stream** (delivered via a media server that fans it out to clients): `serverStreamType`; plus the protocol endpoints `rtspEnable`/`rtspPort`/`rtspsPort`, `srtEnable`/`srtPort`, `hlsEnable`/`hlsPort`, `rtmpEnable`/`rtmpPort`/`rtmpsPort`, `webRtcEnable`/`webRtcPort`, `rtspMulticastIp`/`rtspMulticastPort`, `user`/`password`/`suffix`.
-- **Metadata / KLV**: `metadataEnable`, `metadataPort`, `metadataSuffix`, `klvMode`.
+- **Metadata / KLV**: `metadataEnable`, `metadataPort`, `metadataSuffix`.
 - **Common / encoding**: `enable`, `width`, `height`, `codec`, `fps`, `gop`, `bitrateKbps`, `minBitrateKbps`, `maxBitrateKbps`, `bitrateMode`, `h264Profile`, `jpegQuality`, `fitMode`, `overlayEnable`, `type`, `logLevel`, `custom1..3`, SSL keys/certificates & encryption.
 
 **Table 6** - Video streamer parameters description. Some parameters may be unsupported by a particular video streamer class. The parameters correspond to the [VStreamerParam](#vstreamerparam-enum) enum.
@@ -882,12 +872,11 @@ public:
 | rtmpEncryption  | RTMP encryption type, string: **""** or **"no"**, **"strict"**, **"optional"**. |
 | hlsEncryption   | HLS encryption type, string: **""** or **"no"**, **"yes"**. |
 | logLevel        | Logging mode. Values: **0** - Disable, **1** - Only file, **2** - Only terminal, **3** - File and terminal. |
-| directStreamType | Transport of the direct (user-facing) stream, string: **"rtp"** (default, codec RTP), **"mpegts"** (MPEG-TS over UDP, MISB ST 1402 / STANAG 4609), **"mpegts-rtp"** (MPEG-TS over RTP, MISB ST 1403). With **"mpegts"** / **"mpegts-rtp"** the stream carries KLV metadata per STANAG 4609. **JPEG** supports **"rtp"** only. The particular values depend on implementation. |
-| directStreamBitrateKbps | Target sending bitrate for the direct stream, integer kbps (**>= 0**). Used as the pacer target when **directStreamPacingMode** is **0**. |
-| directStreamMaxPayloadSize | Maximum UDP/RTP payload size for the direct stream, integer bytes **[256:65535]**. Keep **~1420** (MTU 1500) for normal use; large values are for **localhost / trusted LAN** only. Applies to the rtp / mpegts-rtp transports. |
-| directStreamPacingMode | Pacing mode of the direct stream, integer: **0** - target bitrate (token-bucket, uses **directStreamBitrateKbps**), **1** - back-pressure (kernel send-buffer occupancy). |
-| serverStreamType | Transport/type of the **server-delivered** stream — fed to the media server, which fans it out to clients (RTSP/SRT/HLS/RTMP/WebRTC). String: **"rtp"** (codec-RTP + SDP, KLV muxed as a metadata track), **"mpegts"** (STANAG 4609 MPEG-TS; the server demuxes the KLV PID and re-serves it as a native KLV track). The concrete media server is an implementation detail (**MediaMTX** in VStreamerMediaMtx). Distinct from **rtspEnable** (RTSP protocol enable/disable). The particular values depend on implementation. |
-| klvMode | KLV signalling for the MPEG-TS paths (direct mpegts/mpegts-rtp and the mpegts loopback), integer: **0** - asynchronous (stream_type 0x06 + "KLVA" registration, raw KLV), **1** - synchronous (stream_type 0x15 + metadata_descriptor + metadata_std_descriptor, KLV in a metadata_AU_cell). MISB ST 0604. Ignored for the rtp transport. |
+| directStreamType | Transport/type of the direct (point-to-point) stream, string. The accepted values are **implementation-defined**: the abstract **VStreamer** interface does not fix them — each concrete video-streamer implementation defines the value set and the meaning of each value, **including whether KLV metadata is carried** (there is no separate KLV flag). Example values: **"rtp"**, **"mpegts"** (and others, depending on implementation). Default **"rtp"**. |
+| directStreamBitrateKbps | Target sending bitrate for the direct stream, integer kbps. Used as the pacer target when **directStreamPacingMode** is **0**. Default **5000**. |
+| directStreamMaxPayloadSize | Maximum UDP/RTP payload size for the direct stream, integer bytes. Default **1472**. |
+| directStreamPacingMode | Pacing mode of the direct stream, integer: **0** - target bitrate, **1** - push. |
+| serverStreamType | Transport/type of the **server-delivered** stream — fed to the media server, which fans it out to clients. String whose accepted values are **implementation-defined**: the abstract **VStreamer** interface does not fix them — each concrete video-streamer implementation defines the value set and the meaning of each value, **including whether KLV metadata is carried** (there is no separate KLV flag). Example values: **"rtp"**, **"mpegts"** (and others, depending on implementation). Distinct from **rtspEnable** (protocol enable/disable). Default **"rtp"**. |
 
 
 
@@ -971,7 +960,6 @@ struct VStreamerParamsMask
     bool directStreamMaxPayloadSize{true};
     bool directStreamPacingMode{true};
     bool serverStreamType{true};
-    bool klvMode{true};
 };
 ```
 
@@ -1096,7 +1084,6 @@ if(!outConfig.readFromFile("TestVStreamerParams.json"))
         "hlsKey": "wqlovf;qb",
         "hlsPort": 9365,
         "jpegQuality": 22605,
-        "klvMode": 0,
         "logLevel": 0,
         "maxBitrateKbps": 11267,
         "metadataEnable": false,

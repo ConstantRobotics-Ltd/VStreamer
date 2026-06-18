@@ -72,9 +72,8 @@ void fillRandomData(VStreamerParams &a)
     a.directStreamBitrateKbps = rand() % 65535 + 1;
     a.directStreamMaxPayloadSize = rand() % 65535 + 1;
     a.directStreamPacingMode = rand() % 2;
-    const std::string serverStreamTypes[] = {"rtp", "mpegts"};
-    a.serverStreamType = serverStreamTypes[rand() % 2];
-    a.klvMode = rand() % 2;
+    const std::string serverStreamTypes[] = {"rtp", "rtp-klv", "mpegts-rtp-klv"};
+    a.serverStreamType = serverStreamTypes[rand() % 3];
 }
 
 
@@ -454,11 +453,6 @@ bool compareParams(VStreamerParams &a, VStreamerParams &b, VStreamerParamsMask* 
         cout << "serverStreamType" << endl;
         return false;
     }
-    if (mask->klvMode && (a.klvMode != b.klvMode))
-    {
-        cout << "klvMode" << endl;
-        return false;
-    }
     return true;
 }
 
@@ -667,7 +661,6 @@ bool serializeDeserializeWithMaskTest()
     mask.directStreamMaxPayloadSize = true;
     mask.directStreamPacingMode = false;
     mask.serverStreamType = true;
-    mask.klvMode = false;
 
     // Encode data.
     uint8_t data[1024];
