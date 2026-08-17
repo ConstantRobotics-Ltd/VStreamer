@@ -1401,8 +1401,12 @@ void VStreamer::encodeSetParamCommand(
 void cr::video::VStreamer::encodeSetParamCommand(
     uint8_t* data, int& size, VStreamerParam id, std::string value)
 {
-    // Fill header.
-    data[0] = 0x02;
+    // Fill header. 0x03, NOT 0x02: 0x02 is the params-serialize header, and a
+    // string set-param command sharing it meant decodeCommand would misread a
+    // serialized VStreamerParams snapshot as a garbage string set-param. The
+    // two message families now have disjoint header bytes
+    // (0x00 command, 0x01 numeric param, 0x03 string param, 0x02 params).
+    data[0] = 0x03;
     data[1] = VSTREAMER_MAJOR_VERSION;
     data[2] = VSTREAMER_MINOR_VERSION;
 
@@ -1469,8 +1473,11 @@ int cr::video::VStreamer::decodeCommand(uint8_t *data,
         memcpy(&value, &data[7], 4);
         return 1;
     }
-    else if(data[0] == 0x02)
+    else if(data[0] == 0x03)
     {
+        // String set-param. A 0x02 datagram is a params-serialize snapshot, not
+        // a command, and now falls through to the -1 below rather than being
+        // mangled into a string set-param.
         // Check minimum size for string command.
         if (size < 8)
             return -1;

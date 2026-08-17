@@ -326,6 +326,7 @@ public:
         j["jpegQuality"] = p.jpegQuality;
         j["codec"] = p.codec;
         j["fitMode"] = p.fitMode;
+        j["cycleTimeUs"] = p.cycleTimeUs;
         j["overlayEnable"] = p.overlayEnable;
         j["type"] = p.type;
         j["custom1"] = p.custom1;
@@ -398,6 +399,7 @@ public:
         get(j, "jpegQuality", p.jpegQuality);
         get(j, "codec", p.codec);
         get(j, "fitMode", p.fitMode);
+        get(j, "cycleTimeUs", p.cycleTimeUs);
         get(j, "overlayEnable", p.overlayEnable);
         get(j, "type", p.type);
         get(j, "custom1", p.custom1);

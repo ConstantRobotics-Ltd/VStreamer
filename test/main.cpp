@@ -722,6 +722,19 @@ bool encodeDecodeCommandsTest()
                 return false;
             }
         }
+
+        // A params-serialize snapshot (header 0x02) must NOT be decoded as a
+        // command: string set-param now uses 0x03, so the two families no
+        // longer collide and decodeCommand rejects a params blob.
+        VStreamerParam pid;
+        VStreamerCommand cid;
+        float v = 0.0f;
+        std::string sv;
+        if (VStreamer::decodeCommand(buf, n, pid, cid, v, sv) != -1)
+        {
+            cout << "a params snapshot was misdecoded as a command" << endl;
+            return false;
+        }
     }
 
     return true;
