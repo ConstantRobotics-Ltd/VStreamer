@@ -31,13 +31,20 @@ string VStreamer::getVersion()
 bool VStreamerParams::serialize(uint8_t *data, int bufferSize, int &size, VStreamerParamsMask *mask)
 {
     // Check buffer size.
-    if (bufferSize < 12) // Header (11 bytes) + one bool parameter (1 byte).
+    if (bufferSize < 14) // Header (13 bytes) + one bool parameter (1 byte).
     {
         size = 0;
         return false;
     }
 
     // Fill header.
+    //
+    // The mask is 10 bytes, not 8: the 8-byte mask of 3.1 had 60 of its 64
+    // bits taken and could not describe the parameters added in 3.2. Growing
+    // it moves the start of the payload, so a 3.1 peer would misread a 3.2
+    // message -- which it never sees, because deserialize() rejects on the
+    // minor version before it reaches the mask. That version check is what
+    // makes the wire format extensible at all.
     data[0] = 0x02; // Header.
     data[1] = VSTREAMER_MAJOR_VERSION; // Major version.
     data[2] = VSTREAMER_MINOR_VERSION; // Minor version.
@@ -49,6 +56,8 @@ bool VStreamerParams::serialize(uint8_t *data, int bufferSize, int &size, VStrea
     data[8] = 0; // Parameter mask byte 6
     data[9] = 0; // Parameter mask byte 7
     data[10] = 0; // Parameter mask byte 8
+    data[11] = 0; // Parameter mask byte 9
+    data[12] = 0; // Parameter mask byte 10
 
     // If mask is not initialized then encode all parameters.
     VStreamerParamsMask defaultMask;
@@ -56,7 +65,7 @@ bool VStreamerParams::serialize(uint8_t *data, int bufferSize, int &size, VStrea
         mask = &defaultMask;
 
     // Fill data.
-    int pos = 11;
+    int pos = 13;
 
     if (mask->enable && (bufferSize > pos + sizeof(bool)))
     {
@@ -478,6 +487,69 @@ bool VStreamerParams::serialize(uint8_t *data, int bufferSize, int &size, VStrea
         data[10] |= (1 << 4);
     }
 
+    if (mask->multicastTtl && (bufferSize > pos + (int)sizeof(int)))
+    {
+        memcpy(&data[pos], &multicastTtl, sizeof(int));
+        pos += sizeof(int);
+        data[10] |= (1 << 3);
+    }
+
+    if (mask->securityProfile && (bufferSize > pos + (int)securityProfile.size() + 1))
+    {
+        memcpy(&data[pos], securityProfile.c_str(), securityProfile.size() + 1);
+        pos += securityProfile.size() + 1;
+        data[10] |= (1 << 2);
+    }
+
+    if (mask->publicAddress && (bufferSize > pos + (int)publicAddress.size() + 1))
+    {
+        memcpy(&data[pos], publicAddress.c_str(), publicAddress.size() + 1);
+        pos += publicAddress.size() + 1;
+        data[10] |= (1 << 1);
+    }
+
+    if (mask->bindAddress && (bufferSize > pos + (int)bindAddress.size() + 1))
+    {
+        memcpy(&data[pos], bindAddress.c_str(), bindAddress.size() + 1);
+        pos += bindAddress.size() + 1;
+        data[10] |= (1 << 0);
+    }
+
+    if (mask->rtpPortMin && (bufferSize > pos + (int)sizeof(int)))
+    {
+        memcpy(&data[pos], &rtpPortMin, sizeof(int));
+        pos += sizeof(int);
+        data[11] |= (1 << 7);
+    }
+
+    if (mask->rtpPortMax && (bufferSize > pos + (int)sizeof(int)))
+    {
+        memcpy(&data[pos], &rtpPortMax, sizeof(int));
+        pos += sizeof(int);
+        data[11] |= (1 << 6);
+    }
+
+    if (mask->webRtcMediaPort && (bufferSize > pos + (int)sizeof(int)))
+    {
+        memcpy(&data[pos], &webRtcMediaPort, sizeof(int));
+        pos += sizeof(int);
+        data[11] |= (1 << 5);
+    }
+
+    if (mask->corsAllowedOrigin && (bufferSize > pos + (int)corsAllowedOrigin.size() + 1))
+    {
+        memcpy(&data[pos], corsAllowedOrigin.c_str(), corsAllowedOrigin.size() + 1);
+        pos += corsAllowedOrigin.size() + 1;
+        data[11] |= (1 << 4);
+    }
+
+    if (mask->serverStreamMaxPayloadSize && (bufferSize > pos + (int)sizeof(int)))
+    {
+        memcpy(&data[pos], &serverStreamMaxPayloadSize, sizeof(int));
+        pos += sizeof(int);
+        data[11] |= (1 << 3);
+    }
+
     size = pos;
 
     return true;
@@ -507,7 +579,7 @@ static bool readString(const uint8_t* data, int dataSize, int& pos, std::string&
 bool VStreamerParams::deserialize(uint8_t *data, int dataSize)
 {
     // Check data size.
-    if (dataSize < 12)
+    if (dataSize < 14)
         return false;
 
     // Check header.
@@ -515,11 +587,16 @@ bool VStreamerParams::deserialize(uint8_t *data, int dataSize)
         return false;
 
     // Decode version.
+    //
+    // Both halves are checked, and the minor half matters as much as the
+    // major: the parameter mask grew from 8 bytes to 10 in 3.2, so a 3.1
+    // message read with 3.2 offsets would decode garbage into every field.
+    // Rejecting it here is what keeps the format extensible.
     if (data[1] != VSTREAMER_MAJOR_VERSION || data[2] != VSTREAMER_MINOR_VERSION)
         return false;
 
     // Start of actual data.
-    int pos = 11;
+    int pos = 13;
 
     if (checkBit(data[3], 7))
     {
@@ -1197,6 +1274,106 @@ bool VStreamerParams::deserialize(uint8_t *data, int dataSize)
     else
     {
         serverStreamType = "";
+    }
+
+    if (checkBit(data[10], 3))
+    {
+        if (dataSize < pos + (int)sizeof(int))
+            return false;
+        memcpy(&multicastTtl, &data[pos], sizeof(int));
+        pos += sizeof(int);
+    }
+    else
+    {
+        multicastTtl = 0;
+    }
+
+    if (checkBit(data[10], 2))
+    {
+        if (!readString(data, dataSize, pos, securityProfile))
+            return false;
+    }
+    else
+    {
+        securityProfile = "";
+    }
+
+    if (checkBit(data[10], 1))
+    {
+        if (!readString(data, dataSize, pos, publicAddress))
+            return false;
+    }
+    else
+    {
+        publicAddress = "";
+    }
+
+    if (checkBit(data[10], 0))
+    {
+        if (!readString(data, dataSize, pos, bindAddress))
+            return false;
+    }
+    else
+    {
+        bindAddress = "";
+    }
+
+    if (checkBit(data[11], 7))
+    {
+        if (dataSize < pos + (int)sizeof(int))
+            return false;
+        memcpy(&rtpPortMin, &data[pos], sizeof(int));
+        pos += sizeof(int);
+    }
+    else
+    {
+        rtpPortMin = 0;
+    }
+
+    if (checkBit(data[11], 6))
+    {
+        if (dataSize < pos + (int)sizeof(int))
+            return false;
+        memcpy(&rtpPortMax, &data[pos], sizeof(int));
+        pos += sizeof(int);
+    }
+    else
+    {
+        rtpPortMax = 0;
+    }
+
+    if (checkBit(data[11], 5))
+    {
+        if (dataSize < pos + (int)sizeof(int))
+            return false;
+        memcpy(&webRtcMediaPort, &data[pos], sizeof(int));
+        pos += sizeof(int);
+    }
+    else
+    {
+        webRtcMediaPort = 0;
+    }
+
+    if (checkBit(data[11], 4))
+    {
+        if (!readString(data, dataSize, pos, corsAllowedOrigin))
+            return false;
+    }
+    else
+    {
+        corsAllowedOrigin = "";
+    }
+
+    if (checkBit(data[11], 3))
+    {
+        if (dataSize < pos + (int)sizeof(int))
+            return false;
+        memcpy(&serverStreamMaxPayloadSize, &data[pos], sizeof(int));
+        pos += sizeof(int);
+    }
+    else
+    {
+        serverStreamMaxPayloadSize = 0;
     }
 
     return true;

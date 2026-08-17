@@ -74,6 +74,16 @@ void fillRandomData(VStreamerParams &a)
     a.directStreamPacingMode = rand() % 2;
     const std::string serverStreamTypes[] = {"rtp", "rtp-klv", "mpegts-rtp-klv"};
     a.serverStreamType = serverStreamTypes[rand() % 3];
+    a.multicastTtl = rand() % 256;
+    const std::string profiles[] = {"no", "ONVIF", "STRICT_FIPS", "CRA_STRICT"};
+    a.securityProfile = profiles[rand() % 4];
+    a.publicAddress = "203.0.113." + std::to_string(rand() % 256);
+    a.bindAddress = "192.0.2." + std::to_string(rand() % 256);
+    a.rtpPortMin = rand() % 65535;
+    a.rtpPortMax = rand() % 65535;
+    a.webRtcMediaPort = rand() % 65535;
+    a.corsAllowedOrigin = "https://app" + std::to_string(rand() % 100) + ".example";
+    a.serverStreamMaxPayloadSize = rand() % 65535 + 1;
 }
 
 
@@ -453,6 +463,52 @@ bool compareParams(VStreamerParams &a, VStreamerParams &b, VStreamerParamsMask* 
         cout << "serverStreamType" << endl;
         return false;
     }
+    if (mask->multicastTtl && (a.multicastTtl != b.multicastTtl))
+    {
+        cout << "multicastTtl" << endl;
+        return false;
+    }
+    if (mask->securityProfile && (a.securityProfile != b.securityProfile))
+    {
+        cout << "securityProfile" << endl;
+        return false;
+    }
+    if (mask->publicAddress && (a.publicAddress != b.publicAddress))
+    {
+        cout << "publicAddress" << endl;
+        return false;
+    }
+    if (mask->bindAddress && (a.bindAddress != b.bindAddress))
+    {
+        cout << "bindAddress" << endl;
+        return false;
+    }
+    if (mask->rtpPortMin && (a.rtpPortMin != b.rtpPortMin))
+    {
+        cout << "rtpPortMin" << endl;
+        return false;
+    }
+    if (mask->rtpPortMax && (a.rtpPortMax != b.rtpPortMax))
+    {
+        cout << "rtpPortMax" << endl;
+        return false;
+    }
+    if (mask->webRtcMediaPort && (a.webRtcMediaPort != b.webRtcMediaPort))
+    {
+        cout << "webRtcMediaPort" << endl;
+        return false;
+    }
+    if (mask->corsAllowedOrigin && (a.corsAllowedOrigin != b.corsAllowedOrigin))
+    {
+        cout << "corsAllowedOrigin" << endl;
+        return false;
+    }
+    if (mask->serverStreamMaxPayloadSize &&
+        (a.serverStreamMaxPayloadSize != b.serverStreamMaxPayloadSize))
+    {
+        cout << "serverStreamMaxPayloadSize" << endl;
+        return false;
+    }
     return true;
 }
 
@@ -549,6 +605,123 @@ bool encodeDecodeCommandsTest()
     {
         cout << "not equal value" << endl;
         return false;
+    }
+
+    // Every numeric parameter added in 3.2 must survive the round trip. The
+    // test used to cover exactly one id, so a new enum entry could be
+    // unencodable and nothing would say so.
+    const VStreamerParam numericIds[] = {
+        VStreamerParam::MULTICAST_TTL,
+        VStreamerParam::RTP_PORT_MIN,
+        VStreamerParam::RTP_PORT_MAX,
+        VStreamerParam::WEBRTC_MEDIA_PORT,
+        VStreamerParam::SERVER_STREAM_MAX_PAYLOAD};
+    for (VStreamerParam id : numericIds)
+    {
+        outValue = (float)(rand() % 30000);
+        VStreamer::encodeSetParamCommand(data, size, id, outValue);
+        value = 0.0f;
+        strValue = "";
+        if (VStreamer::decodeCommand(data, size, paramId, commandId,
+                                     value, strValue) != 1)
+        {
+            cout << "3.2 numeric param not decoded" << endl;
+            return false;
+        }
+        if (paramId != id || value != outValue)
+        {
+            cout << "3.2 numeric param round trip mismatch" << endl;
+            return false;
+        }
+    }
+
+    // The string parameters, through the string overload.
+    const VStreamerParam stringIds[] = {
+        VStreamerParam::SECURITY_PROFILE,
+        VStreamerParam::PUBLIC_ADDRESS,
+        VStreamerParam::BIND_ADDRESS,
+        VStreamerParam::CORS_ALLOWED_ORIGIN};
+    const std::string stringValues[] = {
+        "CRA_STRICT", "203.0.113.7", "192.0.2.1", "https://app.example"};
+    for (int i = 0; i < 4; ++i)
+    {
+        VStreamer::encodeSetParamCommand(data, size, stringIds[i],
+                                         stringValues[i]);
+        value = 0.0f;
+        strValue = "";
+        // A string set-param decodes as 2, not 1: the return value is the
+        // command KIND (0 command, 1 numeric param, 2 string param), which is
+        // how a caller knows which of value/strValue was filled.
+        if (VStreamer::decodeCommand(data, size, paramId, commandId,
+                                     value, strValue) != 2)
+        {
+            cout << "3.2 string param not decoded" << endl;
+            return false;
+        }
+        if (paramId != stringIds[i] || strValue != stringValues[i])
+        {
+            cout << "3.2 string param round trip mismatch: got '"
+                 << strValue << "'" << endl;
+            return false;
+        }
+    }
+
+    // A params message from a different MINOR version must be refused. This is
+    // the guarantee the wire format rests on: the parameter mask grew from 8
+    // bytes to 10 in 3.2, so a 3.1 message read with 3.2 offsets would decode
+    // garbage into every field rather than fail.
+    {
+        VStreamerParams p;
+        fillRandomData(p);
+        uint8_t buf[4096];
+        int n = 0;
+        if (!p.serialize(buf, sizeof(buf), n))
+        {
+            cout << "params did not serialize" << endl;
+            return false;
+        }
+        VStreamerParams round;
+        if (!round.deserialize(buf, n))
+        {
+            cout << "params did not deserialize" << endl;
+            return false;
+        }
+
+        buf[2] = (uint8_t)(buf[2] + 1);         // a different minor version
+        VStreamerParams other;
+        if (other.deserialize(buf, n))
+        {
+            cout << "a foreign minor version was accepted" << endl;
+            return false;
+        }
+        buf[2] = (uint8_t)(buf[2] - 1);
+        buf[1] = (uint8_t)(buf[1] + 1);         // a different major version
+        if (other.deserialize(buf, n))
+        {
+            cout << "a foreign major version was accepted" << endl;
+            return false;
+        }
+        buf[1] = (uint8_t)(buf[1] - 1);
+        buf[0] = 0x03;                          // not a params message at all
+        if (other.deserialize(buf, n))
+        {
+            cout << "a foreign header byte was accepted" << endl;
+            return false;
+        }
+
+        // And every truncation of a valid message must be refused rather than
+        // read past its end.
+        buf[0] = 0x02;
+        for (int cut = 0; cut < n; ++cut)
+        {
+            VStreamerParams t;
+            if (t.deserialize(buf, cut))
+            {
+                cout << "a truncated params message was accepted at "
+                     << cut << " of " << n << endl;
+                return false;
+            }
+        }
     }
 
     return true;
@@ -661,6 +834,17 @@ bool serializeDeserializeWithMaskTest()
     mask.directStreamMaxPayloadSize = true;
     mask.directStreamPacingMode = false;
     mask.serverStreamType = true;
+    // The 3.2 parameters, deliberately mixed: a mask test proves nothing if
+    // every new bit is set the same way.
+    mask.multicastTtl = true;
+    mask.securityProfile = false;
+    mask.publicAddress = true;
+    mask.bindAddress = false;
+    mask.rtpPortMin = true;
+    mask.rtpPortMax = true;
+    mask.webRtcMediaPort = false;
+    mask.corsAllowedOrigin = true;
+    mask.serverStreamMaxPayloadSize = false;
 
     // Encode data.
     uint8_t data[1024];

@@ -76,6 +76,15 @@ struct VStreamerParamsMask
     bool directStreamMaxPayloadSize{true};
     bool directStreamPacingMode{true};
     bool serverStreamType{true};
+    bool multicastTtl{true};
+    bool securityProfile{true};
+    bool publicAddress{true};
+    bool bindAddress{true};
+    bool rtpPortMin{true};
+    bool rtpPortMax{true};
+    bool webRtcMediaPort{true};
+    bool corsAllowedOrigin{true};
+    bool serverStreamMaxPayloadSize{true};
 };
 
 /**
@@ -215,19 +224,213 @@ public:
     /// each value means, including whether KLV metadata is carried (no separate
     /// flag). Examples: "rtp", "mpegts". Distinct from rtspEnable (protocol on/off).
     std::string serverStreamType{"rtp"};
+    /// Multicast TTL (scope) for every multicast leg, integer [0:255]:
+    /// 0 - implementation default. An implementation may cap the value and
+    /// must document the cap. Applies to every leg that sends to a multicast
+    /// group, not only the RTSP one.
+    int multicastTtl{0};
+    /// Security/compliance profile. String whose accepted values are
+    /// IMPLEMENTATION-DEFINED, in the style of directStreamType: "" or "no" -
+    /// the implementation's own default. An unrecognised value must be
+    /// REJECTED by initVStreamer()/setParam(), never mapped to a default --
+    /// silently downgrading a security posture is the failure this field
+    /// exists to prevent.
+    std::string securityProfile{"no"};
+    /// Public (routed) address advertised to clients in SDP and ICE candidate
+    /// lines instead of the locally detected one, string: "" or "no" - detect
+    /// automatically. An address literal, NOT a hostname: it is written onto
+    /// the wire verbatim. Needed behind 1:1 NAT, in containers, and on
+    /// multi-homed hosts, where the detected address is unroutable for the
+    /// viewer.
+    std::string publicAddress{"no"};
+    /// Local address every listener binds to, string: "" or "0.0.0.0" - every
+    /// interface. A multi-homed host has no other way to keep a stream off an
+    /// interface it must not appear on.
+    std::string bindAddress{"0.0.0.0"};
+    /// Lowest port of the RTP/RTCP range, integer [0:65534]: 0 - any ephemeral
+    /// port. Should be even, because RTCP conventionally takes port+1.
+    int rtpPortMin{0};
+    /// Highest port of the RTP/RTCP range, integer [0:65535]: 0 - any
+    /// ephemeral port. A firewall is configured for a range; without one an
+    /// implementation picks ephemeral ports nothing has been opened for.
+    int rtpPortMax{0};
+    /// WebRTC media (UDP) port, integer [0:65535]: 0 - the implementation
+    /// chooses. Distinct from webRtcPort, which carries signalling only.
+    int webRtcMediaPort{0};
+    /// Single origin permitted to reach the HTTP-based signalling endpoints,
+    /// string "scheme://host[:port]": "" or "no" - the implementation's default
+    /// policy. Deliberately one origin and not a wildcard list.
+    std::string corsAllowedOrigin{"no"};
+    /// Maximum RTP payload size of the server-delivered stream, integer bytes.
+    /// The counterpart of directStreamMaxPayloadSize for the server leg. An
+    /// implementation may clamp it lower: a transform applied after
+    /// packetization (SRTP appends an authentication tag) can otherwise push
+    /// the datagram past the path MTU.
+    int serverStreamMaxPayloadSize{1472};
 
-    JSON_READABLE(VStreamerParams, enable, width, height, directStreamIp, rtspPort, rtspsPort, directStreamPort,
-                  webRtcPort, hlsPort, srtPort, rtmpPort, rtmpsPort, metadataPort,
-                  rtspEnable, directStreamEnable, webRtcEnable, hlsEnable, srtEnable,
-                  rtmpEnable, metadataEnable, rtspMulticastIp, rtspMulticastPort,
-                  user, password, suffix, metadataSuffix, minBitrateKbps,
-                  maxBitrateKbps, bitrateKbps, bitrateMode, fps, gop, h264Profile,
-                  jpegQuality, codec, fitMode, overlayEnable, type, custom1,
-                  custom2, custom3, rtspKey, rtspCert, webRtcKey, webRtcCert,
-                  hlsKey, hlsCert, rtmpKey, rtmpCert, rtspEncryption,
-                  webRtcEncryption, rtmpEncryption, hlsEncryption, logLevel,
-                  directStreamType, directStreamBitrateKbps, directStreamMaxPayloadSize,
-                  directStreamPacingMode, serverStreamType)
+    /// JSON serialisation.
+    ///
+    /// Hand-written rather than JSON_READABLE(): that macro forwards to
+    /// nlohmann's NLOHMANN_DEFINE_TYPE_INTRUSIVE, whose expansion is capped at
+    /// 63 fields, and 3.2 takes the structure past it. Patching the vendored
+    /// amalgamated nlohmann header instead would be undone by its next update.
+    ///
+    /// One deliberate difference from the macro: a key MISSING from the JSON
+    /// leaves the field at its default instead of throwing. The macro's `.at()`
+    /// meant a configuration file that did not list every single parameter
+    /// failed to load at all -- so a file written for 3.1 could not be read by
+    /// 3.2, which is precisely when a deployment needs it to be.
+    template<typename J, typename T>
+    static void get(const J& j, const char* key, T& out)
+    {
+        const auto it = j.find(key);
+        if (it != j.end() && !it->is_null())
+            it->template get_to(out);
+    }
+
+    friend void to_json(nlohmann::json& j, const VStreamerParams& p)
+    {
+        j["enable"] = p.enable;
+        j["width"] = p.width;
+        j["height"] = p.height;
+        j["directStreamIp"] = p.directStreamIp;
+        j["rtspPort"] = p.rtspPort;
+        j["rtspsPort"] = p.rtspsPort;
+        j["directStreamPort"] = p.directStreamPort;
+        j["webRtcPort"] = p.webRtcPort;
+        j["hlsPort"] = p.hlsPort;
+        j["srtPort"] = p.srtPort;
+        j["rtmpPort"] = p.rtmpPort;
+        j["rtmpsPort"] = p.rtmpsPort;
+        j["metadataPort"] = p.metadataPort;
+        j["rtspEnable"] = p.rtspEnable;
+        j["directStreamEnable"] = p.directStreamEnable;
+        j["webRtcEnable"] = p.webRtcEnable;
+        j["hlsEnable"] = p.hlsEnable;
+        j["srtEnable"] = p.srtEnable;
+        j["rtmpEnable"] = p.rtmpEnable;
+        j["metadataEnable"] = p.metadataEnable;
+        j["rtspMulticastIp"] = p.rtspMulticastIp;
+        j["rtspMulticastPort"] = p.rtspMulticastPort;
+        j["user"] = p.user;
+        j["password"] = p.password;
+        j["suffix"] = p.suffix;
+        j["metadataSuffix"] = p.metadataSuffix;
+        j["minBitrateKbps"] = p.minBitrateKbps;
+        j["maxBitrateKbps"] = p.maxBitrateKbps;
+        j["bitrateKbps"] = p.bitrateKbps;
+        j["bitrateMode"] = p.bitrateMode;
+        j["fps"] = p.fps;
+        j["gop"] = p.gop;
+        j["h264Profile"] = p.h264Profile;
+        j["jpegQuality"] = p.jpegQuality;
+        j["codec"] = p.codec;
+        j["fitMode"] = p.fitMode;
+        j["overlayEnable"] = p.overlayEnable;
+        j["type"] = p.type;
+        j["custom1"] = p.custom1;
+        j["custom2"] = p.custom2;
+        j["custom3"] = p.custom3;
+        j["rtspKey"] = p.rtspKey;
+        j["rtspCert"] = p.rtspCert;
+        j["webRtcKey"] = p.webRtcKey;
+        j["webRtcCert"] = p.webRtcCert;
+        j["hlsKey"] = p.hlsKey;
+        j["hlsCert"] = p.hlsCert;
+        j["rtmpKey"] = p.rtmpKey;
+        j["rtmpCert"] = p.rtmpCert;
+        j["rtspEncryption"] = p.rtspEncryption;
+        j["webRtcEncryption"] = p.webRtcEncryption;
+        j["rtmpEncryption"] = p.rtmpEncryption;
+        j["hlsEncryption"] = p.hlsEncryption;
+        j["logLevel"] = p.logLevel;
+        j["directStreamType"] = p.directStreamType;
+        j["directStreamBitrateKbps"] = p.directStreamBitrateKbps;
+        j["directStreamMaxPayloadSize"] = p.directStreamMaxPayloadSize;
+        j["directStreamPacingMode"] = p.directStreamPacingMode;
+        j["serverStreamType"] = p.serverStreamType;
+        j["multicastTtl"] = p.multicastTtl;
+        j["securityProfile"] = p.securityProfile;
+        j["publicAddress"] = p.publicAddress;
+        j["bindAddress"] = p.bindAddress;
+        j["rtpPortMin"] = p.rtpPortMin;
+        j["rtpPortMax"] = p.rtpPortMax;
+        j["webRtcMediaPort"] = p.webRtcMediaPort;
+        j["corsAllowedOrigin"] = p.corsAllowedOrigin;
+        j["serverStreamMaxPayloadSize"] = p.serverStreamMaxPayloadSize;
+    }
+
+    friend void from_json(const nlohmann::json& j, VStreamerParams& p)
+    {
+        get(j, "enable", p.enable);
+        get(j, "width", p.width);
+        get(j, "height", p.height);
+        get(j, "directStreamIp", p.directStreamIp);
+        get(j, "rtspPort", p.rtspPort);
+        get(j, "rtspsPort", p.rtspsPort);
+        get(j, "directStreamPort", p.directStreamPort);
+        get(j, "webRtcPort", p.webRtcPort);
+        get(j, "hlsPort", p.hlsPort);
+        get(j, "srtPort", p.srtPort);
+        get(j, "rtmpPort", p.rtmpPort);
+        get(j, "rtmpsPort", p.rtmpsPort);
+        get(j, "metadataPort", p.metadataPort);
+        get(j, "rtspEnable", p.rtspEnable);
+        get(j, "directStreamEnable", p.directStreamEnable);
+        get(j, "webRtcEnable", p.webRtcEnable);
+        get(j, "hlsEnable", p.hlsEnable);
+        get(j, "srtEnable", p.srtEnable);
+        get(j, "rtmpEnable", p.rtmpEnable);
+        get(j, "metadataEnable", p.metadataEnable);
+        get(j, "rtspMulticastIp", p.rtspMulticastIp);
+        get(j, "rtspMulticastPort", p.rtspMulticastPort);
+        get(j, "user", p.user);
+        get(j, "password", p.password);
+        get(j, "suffix", p.suffix);
+        get(j, "metadataSuffix", p.metadataSuffix);
+        get(j, "minBitrateKbps", p.minBitrateKbps);
+        get(j, "maxBitrateKbps", p.maxBitrateKbps);
+        get(j, "bitrateKbps", p.bitrateKbps);
+        get(j, "bitrateMode", p.bitrateMode);
+        get(j, "fps", p.fps);
+        get(j, "gop", p.gop);
+        get(j, "h264Profile", p.h264Profile);
+        get(j, "jpegQuality", p.jpegQuality);
+        get(j, "codec", p.codec);
+        get(j, "fitMode", p.fitMode);
+        get(j, "overlayEnable", p.overlayEnable);
+        get(j, "type", p.type);
+        get(j, "custom1", p.custom1);
+        get(j, "custom2", p.custom2);
+        get(j, "custom3", p.custom3);
+        get(j, "rtspKey", p.rtspKey);
+        get(j, "rtspCert", p.rtspCert);
+        get(j, "webRtcKey", p.webRtcKey);
+        get(j, "webRtcCert", p.webRtcCert);
+        get(j, "hlsKey", p.hlsKey);
+        get(j, "hlsCert", p.hlsCert);
+        get(j, "rtmpKey", p.rtmpKey);
+        get(j, "rtmpCert", p.rtmpCert);
+        get(j, "rtspEncryption", p.rtspEncryption);
+        get(j, "webRtcEncryption", p.webRtcEncryption);
+        get(j, "rtmpEncryption", p.rtmpEncryption);
+        get(j, "hlsEncryption", p.hlsEncryption);
+        get(j, "logLevel", p.logLevel);
+        get(j, "directStreamType", p.directStreamType);
+        get(j, "directStreamBitrateKbps", p.directStreamBitrateKbps);
+        get(j, "directStreamMaxPayloadSize", p.directStreamMaxPayloadSize);
+        get(j, "directStreamPacingMode", p.directStreamPacingMode);
+        get(j, "serverStreamType", p.serverStreamType);
+        get(j, "multicastTtl", p.multicastTtl);
+        get(j, "securityProfile", p.securityProfile);
+        get(j, "publicAddress", p.publicAddress);
+        get(j, "bindAddress", p.bindAddress);
+        get(j, "rtpPortMin", p.rtpPortMin);
+        get(j, "rtpPortMax", p.rtpPortMax);
+        get(j, "webRtcMediaPort", p.webRtcMediaPort);
+        get(j, "corsAllowedOrigin", p.corsAllowedOrigin);
+        get(j, "serverStreamMaxPayloadSize", p.serverStreamMaxPayloadSize);
+    }
 
     /**
      * @brief Serialize parameters.
@@ -382,7 +585,32 @@ enum class VStreamerParam
     /// Server-delivered stream type, string. Accepted values are
     /// implementation-defined (e.g. "rtp", "mpegts"); the value also decides
     /// whether KLV metadata is carried. Distinct from RTSP_MODE (protocol on/off).
-    SERVER_STREAM_TYPE
+    SERVER_STREAM_TYPE,
+    /// Multicast TTL (scope) for every multicast leg, integer [0:255]:
+    /// 0 - implementation default. An implementation may cap the value and
+    /// must document the cap.
+    MULTICAST_TTL,
+    /// Security/compliance profile, string. Accepted values are
+    /// IMPLEMENTATION-DEFINED; "" or "no" - the implementation's default. An
+    /// unrecognised value must be REJECTED, never silently defaulted.
+    SECURITY_PROFILE,
+    /// Public (routed) address to advertise to clients in SDP/ICE instead of
+    /// the locally detected one, string: "" or "no" - detect automatically.
+    PUBLIC_ADDRESS,
+    /// Local address to bind every listener to, string: "" or "0.0.0.0" -
+    /// every interface.
+    BIND_ADDRESS,
+    /// Lowest port of the RTP/RTCP range, integer: 0 - any ephemeral port.
+    RTP_PORT_MIN,
+    /// Highest port of the RTP/RTCP range, integer: 0 - any ephemeral port.
+    RTP_PORT_MAX,
+    /// WebRTC media (UDP) port, integer: 0 - the implementation chooses.
+    WEBRTC_MEDIA_PORT,
+    /// Single origin permitted to reach the HTTP-based signalling endpoints,
+    /// string: "" or "no" - the implementation's default policy.
+    CORS_ALLOWED_ORIGIN,
+    /// Maximum RTP payload size of the server-delivered stream, integer bytes.
+    SERVER_STREAM_MAX_PAYLOAD
 };
 
 

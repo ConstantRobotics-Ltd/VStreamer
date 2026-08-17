@@ -4,7 +4,7 @@
 
 # **VStreamer interface C++ library**
 
-**v3.1.0**
+**v3.2.0**
 
 
 
@@ -63,6 +63,7 @@ The **VStreamer** C++ library provides a standard interface and defines data str
 | 2.2.0   | 16.06.2026   | - **Breaking serialize/deserialize change** (8th parameter-mask byte added, strict major.minor version gate): producers and consumers must be rebuilt in lockstep.<br/>- New direct-stream parameters: **directStreamBitrateKbps**, **directStreamMaxPayloadSize**, **directStreamPacingMode**.<br/>- New **serverStreamType** (server-delivered stream type). |
 | 3.0.0   | 17.06.2026   | - **Breaking parameter rename** for a clear two-leg model: `ip`→**directStreamIp**, `rtpPort`→**directStreamPort**, `rtpEnable`→**directStreamEnable**; `rtspStreamMode`→**serverStreamType**. Direct-stream params keep the `directStream*` prefix.<br/>- **directStreamType** and **serverStreamType** are **string** values whose accepted set is implementation-defined (each concrete video streamer defines the values and their meaning, including whether KLV metadata is carried; for example `"rtp"`, `"mpegts"`).<br/>- The direct stream is transport-agnostic (its own IP/port, not RTP-specific). |
 | 3.1.0   | 18.06.2026   | - Removed **KlvMode** parameter. |
+| 3.2.0   | 17.08.2026   | - **Breaking serialize/deserialize change**: the parameter mask grows from 8 bytes to 10 (header 11 → 13 bytes), because the 8-byte mask had 60 of its 64 bits taken. Producers and consumers must be rebuilt in lockstep; `deserialize()` refuses a foreign major **or minor** version, so a 3.1 message is rejected rather than misread.<br/>- **JSON**: `VStreamerParams` no longer uses `JSON_READABLE` — nlohmann's macro is capped at 63 fields. `to_json`/`from_json` are written out instead, and a key **missing** from the JSON now leaves the field at its default rather than throwing, so a configuration file written for an older version still loads.<br/>- New parameters: **multicastTtl**, **securityProfile**, **publicAddress**, **bindAddress**, **rtpPortMin**, **rtpPortMax**, **webRtcMediaPort**, **corsAllowedOrigin**, **serverStreamMaxPayloadSize**. |
 
 
 
@@ -573,7 +574,16 @@ enum class VStreamerParam
     /// Server-delivered stream type, string. Accepted values are
     /// implementation-defined (e.g. "rtp", "mpegts"); the value also decides
     /// whether KLV metadata is carried. Distinct from RTSP_MODE (protocol on/off).
-    SERVER_STREAM_TYPE
+    SERVER_STREAM_TYPE,
+    MULTICAST_TTL,
+    SECURITY_PROFILE,
+    PUBLIC_ADDRESS,
+    BIND_ADDRESS,
+    RTP_PORT_MIN,
+    RTP_PORT_MAX,
+    WEBRTC_MEDIA_PORT,
+    CORS_ALLOWED_ORIGIN,
+    SERVER_STREAM_MAX_PAYLOAD
 };
 ```
 
@@ -641,6 +651,15 @@ enum class VStreamerParam
 | DIRECT_STREAM_MAX_PAYLOAD | Maximum UDP/RTP payload size for the direct stream, integer bytes. |
 | DIRECT_STREAM_PACING_MODE | Pacing mode of the direct stream, integer: **0** - target bitrate, **1** - push. |
 | SERVER_STREAM_TYPE | Transport/type of the **server-delivered** stream — fed to the media server, which fans it out to clients. String whose accepted values are **implementation-defined**: the abstract **VStreamer** interface does not fix them — each concrete video-streamer implementation defines the value set and the meaning of each value, **including whether KLV metadata is carried** (there is no separate KLV flag). Example values: **"rtp"**, **"mpegts"** (and others, depending on implementation). Distinct from **RTSP_MODE** (protocol enable/disable). Default **"rtp"**. |
+| MULTICAST_TTL | Multicast TTL (scope) for **every** multicast leg, integer **[0:255]**: **0** - implementation default. An implementation may cap the value and must document the cap. Not RTSP-specific: it applies wherever the implementation sends to a group. Default **0**. |
+| SECURITY_PROFILE | Security/compliance profile. String whose accepted values are **implementation-defined**, in the style of **DIRECT_STREAM_TYPE**: **""** or **"no"** - the implementation's own default. An unrecognised value **must be rejected**, never mapped to a default — silently downgrading a security posture is the failure this parameter exists to prevent. Default **"no"**. |
+| PUBLIC_ADDRESS | Public (routed) address advertised to clients in SDP and ICE candidate lines instead of the locally detected one, string: **""** or **"no"** - detect automatically. An address **literal**, not a hostname: it goes onto the wire verbatim. Needed behind 1:1 NAT, in containers and on multi-homed hosts. Default **"no"**. |
+| BIND_ADDRESS | Local address every listener binds to, string: **""** or **"0.0.0.0"** - every interface. A multi-homed host has no other way to keep a stream off an interface it must not appear on. Default **"0.0.0.0"**. |
+| RTP_PORT_MIN | Lowest port of the RTP/RTCP range, integer **[0:65534]**: **0** - any ephemeral port. Should be even, because RTCP conventionally takes port+1. Default **0**. |
+| RTP_PORT_MAX | Highest port of the RTP/RTCP range, integer **[0:65535]**: **0** - any ephemeral port. A firewall is configured for a range; without one an implementation picks ephemeral ports nothing has been opened for. Default **0**. |
+| WEBRTC_MEDIA_PORT | WebRTC media (UDP) port, integer **[0:65535]**: **0** - the implementation chooses. Distinct from **WEBRTC_PORT**, which carries signalling only. Default **0**. |
+| CORS_ALLOWED_ORIGIN | Single origin permitted to reach the HTTP-based signalling endpoints, string **"scheme://host[:port]"**: **""** or **"no"** - the implementation's default policy. Deliberately one origin, not a wildcard list. Default **"no"**. |
+| SERVER_STREAM_MAX_PAYLOAD | Maximum RTP payload size of the **server-delivered** stream, integer bytes — the counterpart of **DIRECT_STREAM_MAX_PAYLOAD**. An implementation may clamp it lower: a transform applied after packetization (SRTP appends an authentication tag) can otherwise push the datagram past the path MTU. Default **1472**. |
 
 
 
@@ -784,6 +803,29 @@ public:
     /// each value means, including whether KLV metadata is carried (no separate
     /// flag). Examples: "rtp", "mpegts". Distinct from rtspEnable (protocol on/off).
     std::string serverStreamType{"rtp"};
+    /// Multicast TTL (scope) for every multicast leg, integer [0:255]:
+    /// 0 - implementation default.
+    int multicastTtl{0};
+    /// Security/compliance profile. Accepted values are implementation-defined;
+    /// "" or "no" - the implementation's default. An unrecognised value must be
+    /// REJECTED, never mapped to a default.
+    std::string securityProfile{"no"};
+    /// Public (routed) address advertised in SDP/ICE instead of the detected
+    /// one, string: "" or "no" - detect automatically. A literal, not a name.
+    std::string publicAddress{"no"};
+    /// Local address every listener binds to, string: "" or "0.0.0.0" - all.
+    std::string bindAddress{"0.0.0.0"};
+    /// Lowest port of the RTP/RTCP range, integer: 0 - any ephemeral port.
+    int rtpPortMin{0};
+    /// Highest port of the RTP/RTCP range, integer: 0 - any ephemeral port.
+    int rtpPortMax{0};
+    /// WebRTC media (UDP) port, integer: 0 - the implementation chooses.
+    int webRtcMediaPort{0};
+    /// Single origin permitted to reach HTTP-based signalling, string:
+    /// "" or "no" - the implementation's default policy.
+    std::string corsAllowedOrigin{"no"};
+    /// Maximum RTP payload size of the server-delivered stream, integer bytes.
+    int serverStreamMaxPayloadSize{1472};
 
     JSON_READABLE(VStreamerParams, enable, width, height, directStreamIp, rtspPort, rtspsPort, directStreamPort,
                   webRtcPort, hlsPort, srtPort, rtmpPort, rtmpsPort, metadataPort,
@@ -796,7 +838,10 @@ public:
                   hlsKey, hlsCert, rtmpKey, rtmpCert, rtspEncryption,
                   webRtcEncryption, rtmpEncryption, hlsEncryption, logLevel,
                   directStreamType, directStreamBitrateKbps, directStreamMaxPayloadSize,
-                  directStreamPacingMode, serverStreamType)
+                  directStreamPacingMode, serverStreamType, multicastTtl,
+                  securityProfile, publicAddress, bindAddress, rtpPortMin,
+                  rtpPortMax, webRtcMediaPort, corsAllowedOrigin,
+                  serverStreamMaxPayloadSize)
 
     /// Serialize parameters.
     bool serialize(uint8_t* data, int bufferSize, int& size,
