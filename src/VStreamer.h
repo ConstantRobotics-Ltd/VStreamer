@@ -436,9 +436,10 @@ public:
 
     /**
      * @brief Serialize parameters.
-     * @param data Pointer to data buffer. Must be at least 12 bytes (header
-     *             plus one bool field); if smaller than the size required for
-     *             all selected parameters, fewer parameters are serialized.
+     * @param data Pointer to data buffer. Must be at least 14 bytes (13-byte
+     *             header plus one bool field); if smaller than the size
+     *             required for all selected parameters, fewer parameters are
+     *             serialized.
      * @param bufferSize Size of data buffer.
      * @param size Size of data.
      * @param mask Pointer to parameters mask.
@@ -727,6 +728,8 @@ public:
      * @param id Parameter ID.
      * @param value Parameter value.
      */
+    /// @note @p data must be non-null and at least 11 bytes. A null
+    ///       pointer sets @p size to 0 and writes nothing.
     static void encodeSetParamCommand(uint8_t *data, int &size, 
                                         VStreamerParam id, float value);
 
@@ -758,7 +761,9 @@ public:
      * @param commandId Output command ID.
      * @param value Parameter or command value.
      * @param strValue Parameter or command string value.
-     * @return -1 - Error 
+     * @return -1 - Error (null buffer, wrong version, unknown header,
+     *              inexact COMMAND/float size, or a string payload that is
+     *              missing its terminator or has trailing bytes).
      *          0 - Action command decoded.
      *          1 - Set parameter command with float value.
      *          2 - Set parameter command with string value.

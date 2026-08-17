@@ -116,42 +116,59 @@ int main(void)
     cout << "#####################################" << endl;
     cout << endl;
 
+    int failed = 0;
+
     cout << "Copy test:" << endl;
     if (copyTest())
         cout << "OK" << endl;
     else
+    {
         cout << "ERROR" << endl;
+        ++failed;
+    }
     cout << endl;
 
     cout << "Serialize/Deserialize test:" << endl;
     if (serializeDeserializeTest())
         cout << "OK" << endl;
     else
+    {
         cout << "ERROR" << endl;
+        ++failed;
+    }
     cout << endl;
 
     cout << "Serialize/Deserialize test with params mask:" << endl;
     if (serializeDeserializeWithMaskTest())
         cout << "OK" << endl;
     else
+    {
         cout << "ERROR" << endl;
+        ++failed;
+    }
     cout << endl;
 
     cout << "Encode/Decode commands test:" << endl;
     if (encodeDecodeCommandsTest())
         cout << "OK" << endl;
     else
+    {
         cout << "ERROR" << endl;
+        ++failed;
+    }
     cout << endl;
 
     cout << "JSON read/write test:" << endl;
     if (jsonReadWriteTest())
         cout << "OK" << endl;
     else
+    {
         cout << "ERROR" << endl;
+        ++failed;
+    }
     cout << endl;
 
-    return 0;
+    return failed ? 1 : 0;
 }
 
 
@@ -737,6 +754,96 @@ bool encodeDecodeCommandsTest()
         }
     }
 
+    // encode/decode must refuse a null buffer rather than write through it.
+    {
+        int n = 99;
+        VStreamer::encodeCommand(nullptr, n, VStreamerCommand::RESTART);
+        if (n != 0)
+        {
+            cout << "encodeCommand(nullptr) did not report size 0" << endl;
+            return false;
+        }
+        n = 99;
+        VStreamer::encodeSetParamCommand(nullptr, n, VStreamerParam::WIDTH, 1.0f);
+        if (n != 0)
+        {
+            cout << "encodeSetParamCommand(nullptr, float) did not report size 0"
+                 << endl;
+            return false;
+        }
+        n = 99;
+        VStreamer::encodeSetParamCommand(nullptr, n, VStreamerParam::CODEC,
+                                         std::string("H264"));
+        if (n != 0)
+        {
+            cout << "encodeSetParamCommand(nullptr, string) did not report size 0"
+                 << endl;
+            return false;
+        }
+        if (VStreamer::decodeCommand(nullptr, 11, paramId, commandId,
+                                     value, strValue) != -1)
+        {
+            cout << "decodeCommand(nullptr) was accepted" << endl;
+            return false;
+        }
+    }
+
+    // A string SET_PARAM without a terminator, or with trailing garbage after
+    // the terminator, must be refused. The old decoder stuffed a '\0' at a
+    // 511-byte cap and accepted both.
+    {
+        uint8_t raw[16] = {0x03, 3, 2};
+        int id = (int)VStreamerParam::CODEC;
+        memcpy(&raw[3], &id, 4);
+        raw[7] = 'A'; raw[8] = 'B'; raw[9] = 'C';   // no terminator
+        if (VStreamer::decodeCommand(raw, 10, paramId, commandId,
+                                     value, strValue) != -1)
+        {
+            cout << "unterminated string SET_PARAM was accepted" << endl;
+            return false;
+        }
+        raw[7] = 'A'; raw[8] = 0; raw[9] = 'X';     // terminator, then junk
+        if (VStreamer::decodeCommand(raw, 10, paramId, commandId,
+                                     value, strValue) != -1)
+        {
+            cout << "string SET_PARAM with trailing bytes was accepted" << endl;
+            return false;
+        }
+        uint8_t cmd[8] = {0x00, 3, 2};
+        int cid = (int)VStreamerCommand::RESTART;
+        memcpy(&cmd[3], &cid, 4);
+        cmd[7] = 0xFF;                              // COMMAND is exactly 7 bytes
+        if (VStreamer::decodeCommand(cmd, 8, paramId, commandId,
+                                     value, strValue) != -1)
+        {
+            cout << "over-long COMMAND was accepted" << endl;
+            return false;
+        }
+    }
+
+    // serialize() used `bufferSize > pos + n`, so a buffer sized exactly to
+    // the payload dropped the last field. A 14-byte buffer must still hold
+    // the header plus one bool.
+    {
+        VStreamerParams p;
+        p.enable = true;
+        VStreamerParamsMask mask{};   // all false
+        mask.enable = true;
+        uint8_t tiny[14];
+        int n = 0;
+        if (!p.serialize(tiny, 14, n, &mask) || n != 14)
+        {
+            cout << "exact-size serialize of one bool failed, n=" << n << endl;
+            return false;
+        }
+        VStreamerParams out;
+        if (!out.deserialize(tiny, n) || out.enable != true)
+        {
+            cout << "exact-size serialize/deserialize of enable failed" << endl;
+            return false;
+        }
+    }
+
     return true;
 }
 
@@ -768,10 +875,8 @@ bool jsonReadWriteTest()
         return false;
     }
 
-    // cycleTimeUs is a calculated field and is not stored in JSON, so exclude
-    // it from the comparison.
+    // cycleTimeUs is in the JSON as of 3.2 (it used to be binary-only).
     VStreamerParamsMask mask;
-    mask.cycleTimeUs = false;
 
     // Compare params.
     return compareParams(in, out, &mask);

@@ -63,7 +63,7 @@ The **VStreamer** C++ library provides a standard interface and defines data str
 | 2.2.0   | 16.06.2026   | - **Breaking serialize/deserialize change** (8th parameter-mask byte added, strict major.minor version gate): producers and consumers must be rebuilt in lockstep.<br/>- New direct-stream parameters: **directStreamBitrateKbps**, **directStreamMaxPayloadSize**, **directStreamPacingMode**.<br/>- New **serverStreamType** (server-delivered stream type). |
 | 3.0.0   | 17.06.2026   | - **Breaking parameter rename** for a clear two-leg model: `ip`→**directStreamIp**, `rtpPort`→**directStreamPort**, `rtpEnable`→**directStreamEnable**; `rtspStreamMode`→**serverStreamType**. Direct-stream params keep the `directStream*` prefix.<br/>- **directStreamType** and **serverStreamType** are **string** values whose accepted set is implementation-defined (each concrete video streamer defines the values and their meaning, including whether KLV metadata is carried; for example `"rtp"`, `"mpegts"`).<br/>- The direct stream is transport-agnostic (its own IP/port, not RTP-specific). |
 | 3.1.0   | 18.06.2026   | - Removed **KlvMode** parameter. |
-| 3.2.0   | 17.08.2026   | - **Breaking serialize/deserialize change**: the parameter mask grows from 8 bytes to 10 (header 11 → 13 bytes), because the 8-byte mask had 60 of its 64 bits taken. Producers and consumers must be rebuilt in lockstep; `deserialize()` refuses a foreign major **or minor** version, so a 3.1 message is rejected rather than misread.<br/>- **JSON**: `VStreamerParams` no longer uses `JSON_READABLE` — nlohmann's macro is capped at 63 fields. `to_json`/`from_json` are written out instead, and a key **missing** from the JSON now leaves the field at its default rather than throwing, so a configuration file written for an older version still loads.<br/>- New parameters: **multicastTtl**, **securityProfile**, **publicAddress**, **bindAddress**, **rtpPortMin**, **rtpPortMax**, **webRtcMediaPort**, **corsAllowedOrigin**, **serverStreamMaxPayloadSize**.<br/>- **Command header disambiguated**: a string SET_PARAM command now uses header byte **0x03**, not **0x02**. **0x02** is the params-serialize header, and sharing it meant **decodeCommand** could misread a serialized **VStreamerParams** snapshot as a garbage string SET_PARAM. The four families are now disjoint: **0x00** COMMAND, **0x01** float SET_PARAM, **0x02** params, **0x03** string SET_PARAM. **decodeCommand** now returns **-1** for a **0x02** datagram.<br/>- **cycleTimeUs** added to `to_json`/`from_json`, matching the binary format (it was in `serialize()` but not the JSON). |
+| 3.2.0   | 17.08.2026   | - **Breaking serialize/deserialize change**: the parameter mask grows from 8 bytes to 10 (header 11 → 13 bytes), because the 8-byte mask had 60 of its 64 bits taken. Producers and consumers must be rebuilt in lockstep; `deserialize()` refuses a foreign major **or minor** version, so a 3.1 message is rejected rather than misread.<br/>- **JSON**: `VStreamerParams` no longer uses `JSON_READABLE` — nlohmann's macro is capped at 63 fields. `to_json`/`from_json` are written out instead, and a key **missing** from the JSON now leaves the field at its default rather than throwing, so a configuration file written for an older version still loads.<br/>- New parameters: **multicastTtl**, **securityProfile**, **publicAddress**, **bindAddress**, **rtpPortMin**, **rtpPortMax**, **webRtcMediaPort**, **corsAllowedOrigin**, **serverStreamMaxPayloadSize**.<br/>- **Command header disambiguated**: a string SET_PARAM command now uses header byte **0x03**, not **0x02**. **0x02** is the params-serialize header, and sharing it meant **decodeCommand** could misread a serialized **VStreamerParams** snapshot as a garbage string SET_PARAM. The four families are now disjoint: **0x00** COMMAND, **0x01** float SET_PARAM, **0x02** params, **0x03** string SET_PARAM. **decodeCommand** now returns **-1** for a **0x02** datagram.<br/>- **cycleTimeUs** added to `to_json`/`from_json`, matching the binary format (it was in `serialize()` but not the JSON).<br/>- **encode/decode hardening** (same 3.2 wire format): null buffers are refused; COMMAND and float SET_PARAM require an exact size; a string SET_PARAM must contain exactly one in-range null terminator (no 511-byte silent truncation); `serialize()` uses an inclusive size check so a buffer sized to the payload no longer drops the last field. Well-formed 3.2 peers are unchanged. |
 
 
 
@@ -192,7 +192,7 @@ std::cout << "VStreamer class version: " << VStreamer::getVersion();
 Console output:
 
 ```bash
-VStreamer class version: 3.0.0
+VStreamer class version: 3.2.0
 ```
 
 
@@ -398,7 +398,7 @@ static int decodeCommand(uint8_t* data,
 | Parameter | Description                                                  |
 | --------- | ------------------------------------------------------------ |
 | data      | Pointer to input command.                                    |
-| size      | Size of command. Should be exactly 11 bytes for a float SET_PARAM command, at least 8 bytes for a string SET_PARAM command, and 7 bytes for COMMAND. |
+| size      | Size of command. Must be exactly 11 bytes for a float SET_PARAM command, exactly 8 + `strlen(strValue)` bytes (including the null terminator) for a string SET_PARAM command, and exactly 7 bytes for COMMAND. A longer or unterminated buffer is an error. |
 | paramId   | Parameter ID according to [VStreamerParam](#vstreamerparam-enum) enum. After decoding a SET_PARAM command the method will return the parameter ID. |
 | commandId | Command ID according to [VStreamerCommand](#vstreamercommand-enum) enum. After decoding a COMMAND the method will return the command ID. |
 | value    | Numeric video streamer parameter value. Only for non-string parameters. For string parameters (see [VStreamerParam](#vstreamerparam-enum) enum) this parameter may have any value. |
@@ -406,7 +406,7 @@ static int decodeCommand(uint8_t* data,
 
 **Returns:** **0** - in case of decoding COMMAND, **1** - in case of decoding SET_PARAM command with float value, **2** - in case of decoding SET_PARAM command with string value, or **-1** in case of errors.
 
-The header byte selects the family: **0x00** COMMAND, **0x01** float SET_PARAM, **0x03** string SET_PARAM. **0x02** is the header a serialized **VStreamerParams** snapshot carries (see [serialize](#serialize-method)); a **0x02** datagram is therefore **not** a command and **decodeCommand** returns **-1** for it, rather than misreading the parameter mask as a command payload.
+The header byte selects the family: **0x00** COMMAND, **0x01** float SET_PARAM, **0x03** string SET_PARAM. **0x02** is the header a serialized **VStreamerParams** snapshot carries (see [serialize](#serialize-method)); a **0x02** datagram is therefore **not** a command and **decodeCommand** returns **-1** for it, rather than misreading the parameter mask as a command payload. A **null** `data` pointer, a COMMAND or float SET_PARAM whose `size` is not exact, and a string SET_PARAM that is missing its null terminator or that has bytes after it, also return **-1**.
 
 
 
