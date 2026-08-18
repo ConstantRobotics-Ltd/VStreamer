@@ -607,7 +607,9 @@ bool VStreamerParams::deserialize(uint8_t *data, int dataSize)
     {
         if (dataSize < pos + 1)
             return false;
-        memcpy(&enable, &data[pos], sizeof(bool));
+        // Normalised, not memcpy'd: a bool holding any byte other than 0
+        // or 1 is undefined behaviour, and the wire is attacker-supplied.
+        enable = (data[pos] != 0);
         pos += sizeof(bool);
     }
     else
@@ -737,7 +739,9 @@ bool VStreamerParams::deserialize(uint8_t *data, int dataSize)
     {
         if (dataSize < pos + 1)
             return false;
-        memcpy(&rtspEnable, &data[pos], sizeof(bool));
+        // Normalised, not memcpy'd: a bool holding any byte other than 0
+        // or 1 is undefined behaviour, and the wire is attacker-supplied.
+        rtspEnable = (data[pos] != 0);
         pos += sizeof(bool);
     }
     else
@@ -749,7 +753,9 @@ bool VStreamerParams::deserialize(uint8_t *data, int dataSize)
     {
         if (dataSize < pos + 1)
             return false;
-        memcpy(&directStreamEnable, &data[pos], sizeof(bool));
+        // Normalised, not memcpy'd: a bool holding any byte other than 0
+        // or 1 is undefined behaviour, and the wire is attacker-supplied.
+        directStreamEnable = (data[pos] != 0);
         pos += sizeof(bool);
     }
     else
@@ -761,7 +767,9 @@ bool VStreamerParams::deserialize(uint8_t *data, int dataSize)
     {
         if (dataSize < pos + 1)
             return false;
-        memcpy(&webRtcEnable, &data[pos], sizeof(bool));
+        // Normalised, not memcpy'd: a bool holding any byte other than 0
+        // or 1 is undefined behaviour, and the wire is attacker-supplied.
+        webRtcEnable = (data[pos] != 0);
         pos += sizeof(bool);
     }
     else
@@ -773,7 +781,9 @@ bool VStreamerParams::deserialize(uint8_t *data, int dataSize)
     {
         if (dataSize < pos + 1)
             return false;
-        memcpy(&hlsEnable, &data[pos], sizeof(bool));
+        // Normalised, not memcpy'd: a bool holding any byte other than 0
+        // or 1 is undefined behaviour, and the wire is attacker-supplied.
+        hlsEnable = (data[pos] != 0);
         pos += sizeof(bool);
     }
     else
@@ -785,7 +795,9 @@ bool VStreamerParams::deserialize(uint8_t *data, int dataSize)
     {
         if (dataSize < pos + 1)
             return false;
-        memcpy(&srtEnable, &data[pos], sizeof(bool));
+        // Normalised, not memcpy'd: a bool holding any byte other than 0
+        // or 1 is undefined behaviour, and the wire is attacker-supplied.
+        srtEnable = (data[pos] != 0);
         pos += sizeof(bool);
     }
     else
@@ -797,7 +809,9 @@ bool VStreamerParams::deserialize(uint8_t *data, int dataSize)
     {
         if (dataSize < pos + 1)
             return false;
-        memcpy(&rtmpEnable, &data[pos], sizeof(bool));
+        // Normalised, not memcpy'd: a bool holding any byte other than 0
+        // or 1 is undefined behaviour, and the wire is attacker-supplied.
+        rtmpEnable = (data[pos] != 0);
         pos += sizeof(bool);
     }
     else
@@ -809,7 +823,9 @@ bool VStreamerParams::deserialize(uint8_t *data, int dataSize)
     {
         if (dataSize < pos + 1)
             return false;
-        memcpy(&metadataEnable, &data[pos], sizeof(bool));
+        // Normalised, not memcpy'd: a bool holding any byte other than 0
+        // or 1 is undefined behaviour, and the wire is attacker-supplied.
+        metadataEnable = (data[pos] != 0);
         pos += sizeof(bool);
     }
     else
@@ -1013,7 +1029,9 @@ bool VStreamerParams::deserialize(uint8_t *data, int dataSize)
     {
         if (dataSize < pos + 1)
             return false;
-        memcpy(&overlayEnable, &data[pos], sizeof(bool));
+        // Normalised, not memcpy'd: a bool holding any byte other than 0
+        // or 1 is undefined behaviour, and the wire is attacker-supplied.
+        overlayEnable = (data[pos] != 0);
         pos += sizeof(bool);
     }
     else

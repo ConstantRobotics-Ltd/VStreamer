@@ -63,7 +63,7 @@ The **VStreamer** C++ library provides a standard interface and defines data str
 | 2.2.0   | 16.06.2026   | - **Breaking serialize/deserialize change** (8th parameter-mask byte added, strict major.minor version gate): producers and consumers must be rebuilt in lockstep.<br/>- New direct-stream parameters: **directStreamBitrateKbps**, **directStreamMaxPayloadSize**, **directStreamPacingMode**.<br/>- New **serverStreamType** (server-delivered stream type). |
 | 3.0.0   | 17.06.2026   | - **Breaking parameter rename** for a clear two-leg model: `ip`→**directStreamIp**, `rtpPort`→**directStreamPort**, `rtpEnable`→**directStreamEnable**; `rtspStreamMode`→**serverStreamType**. Direct-stream params keep the `directStream*` prefix.<br/>- **directStreamType** and **serverStreamType** are **string** values whose accepted set is implementation-defined (each concrete video streamer defines the values and their meaning, including whether KLV metadata is carried; for example `"rtp"`, `"mpegts"`).<br/>- The direct stream is transport-agnostic (its own IP/port, not RTP-specific). |
 | 3.1.0   | 18.06.2026   | - Removed **KlvMode** parameter. |
-| 3.2.0   | 17.08.2026   | - **Breaking serialize/deserialize change**: the parameter mask grows from 8 bytes to 10 (header 11 → 13 bytes), because the 8-byte mask had 60 of its 64 bits taken. Producers and consumers must be rebuilt in lockstep; `deserialize()` refuses a foreign major **or minor** version, so a 3.1 message is rejected rather than misread.<br/>- **JSON**: `VStreamerParams` no longer uses `JSON_READABLE` — nlohmann's macro is capped at 63 fields. `to_json`/`from_json` are written out instead, and a key **missing** from the JSON now leaves the field at its default rather than throwing, so a configuration file written for an older version still loads.<br/>- New parameters: **multicastTtl**, **securityProfile**, **publicAddress**, **bindAddress**, **rtpPortMin**, **rtpPortMax**, **webRtcMediaPort**, **corsAllowedOrigin**, **serverStreamMaxPayloadSize**.<br/>- **Command header disambiguated**: a string SET_PARAM command now uses header byte **0x03**, not **0x02**. **0x02** is the params-serialize header, and sharing it meant **decodeCommand** could misread a serialized **VStreamerParams** snapshot as a garbage string SET_PARAM. The four families are now disjoint: **0x00** COMMAND, **0x01** float SET_PARAM, **0x02** params, **0x03** string SET_PARAM. **decodeCommand** now returns **-1** for a **0x02** datagram.<br/>- **cycleTimeUs** added to `to_json`/`from_json`, matching the binary format (it was in `serialize()` but not the JSON).<br/>- **encode/decode hardening** (same 3.2 wire format): null buffers are refused; COMMAND and float SET_PARAM require an exact size; a string SET_PARAM must contain exactly one in-range null terminator (no 511-byte silent truncation); `serialize()` uses an inclusive size check so a buffer sized to the payload no longer drops the last field. Well-formed 3.2 peers are unchanged. |
+| 3.2.0   | 17.08.2026   | - Added new parameters. |
 
 
 
@@ -406,7 +406,7 @@ static int decodeCommand(uint8_t* data,
 
 **Returns:** **0** - in case of decoding COMMAND, **1** - in case of decoding SET_PARAM command with float value, **2** - in case of decoding SET_PARAM command with string value, or **-1** in case of errors.
 
-The header byte selects the family: **0x00** COMMAND, **0x01** float SET_PARAM, **0x03** string SET_PARAM. **0x02** is the header a serialized **VStreamerParams** snapshot carries (see [serialize](#serialize-method)); a **0x02** datagram is therefore **not** a command and **decodeCommand** returns **-1** for it, rather than misreading the parameter mask as a command payload. A **null** `data` pointer, a COMMAND or float SET_PARAM whose `size` is not exact, and a string SET_PARAM that is missing its null terminator or that has bytes after it, also return **-1**.
+The header byte selects the family: **0x00** COMMAND, **0x01** float SET_PARAM, **0x03** string SET_PARAM. **0x02** is the header a serialized **VStreamerParams** snapshot carries (see [Serialize video streamer parameters](#serialize-video-streamer-parameters)); a **0x02** datagram is therefore **not** a command and **decodeCommand** returns **-1** for it, rather than misreading the parameter mask as a command payload. A **null** `data` pointer, a COMMAND or float SET_PARAM whose `size` is not exact, and a string SET_PARAM that is missing its null terminator or that has bytes after it, also return **-1**.
 
 
 
@@ -458,7 +458,7 @@ enum class VStreamerParam
     WIDTH,
     /// Video stream height, integer [0:8192].
     HEIGHT,
-    /// Destination IP of the direct stream (point-to-point, bypasses MediaMTX), string.
+    /// Destination IP of the direct stream, string.
     DIRECT_STREAM_IP,
     /// RTSP port, integer [0:65535].
     RTSP_PORT,
@@ -526,7 +526,7 @@ enum class VStreamerParam
     FIT_MODE,
     /// Cycle time, integer μsec (microseconds). Calculated by video streamer.
     CYCLE_TIME_USEC,
-    /// Overlay enable / disable, integer: 0 - disable, 1 - enable.
+    /// Overlay mode, integer: 0 - disable, 1 - enable.
     OVERLAY_MODE,
     /// Type of the streamer, integer. Depends on implementation.
     TYPE,
@@ -577,14 +577,30 @@ enum class VStreamerParam
     /// implementation-defined (e.g. "rtp", "mpegts"); the value also decides
     /// whether KLV metadata is carried. Distinct from RTSP_MODE (protocol on/off).
     SERVER_STREAM_TYPE,
+    /// Multicast TTL (scope) for every multicast leg, integer [0:255]:
+    /// 0 - implementation default. An implementation may cap the value and
+    /// must document the cap.
     MULTICAST_TTL,
+    /// Security/compliance profile, string. Accepted values are
+    /// IMPLEMENTATION-DEFINED; "" or "no" - the implementation's default. An
+    /// unrecognised value must be REJECTED, never silently defaulted.
     SECURITY_PROFILE,
+    /// Public (routed) address to advertise to clients in SDP/ICE instead of
+    /// the locally detected one, string: "" or "no" - detect automatically.
     PUBLIC_ADDRESS,
+    /// Local address to bind every listener to, string: "" or "0.0.0.0" -
+    /// every interface.
     BIND_ADDRESS,
+    /// Lowest port of the RTP/RTCP range, integer: 0 - any ephemeral port.
     RTP_PORT_MIN,
+    /// Highest port of the RTP/RTCP range, integer: 0 - any ephemeral port.
     RTP_PORT_MAX,
+    /// WebRTC media (UDP) port, integer: 0 - the implementation chooses.
     WEBRTC_MEDIA_PORT,
+    /// Single origin permitted to reach the HTTP-based signalling endpoints,
+    /// string: "" or "no" - the implementation's default policy.
     CORS_ALLOWED_ORIGIN,
+    /// Maximum RTP payload size of the server-delivered stream, integer bytes.
     SERVER_STREAM_MAX_PAYLOAD
 };
 ```
@@ -671,7 +687,7 @@ enum class VStreamerParam
 
 ## VStreamerParams class declaration
 
-The **VStreamerParams** class is used for video stream initialization (the [initVStreamer(...)](#initvstreamer-method) method) or to get all actual parameters (the [getParams(...)](#getparams-method) method). Also, **VStreamerParams** provides a structure to write/read parameters from JSON files (**JSON_READABLE** macro, see [ConfigReader](https://rapidpixel.constantrobotics.com/docs/Service/ConfigReader.html) class description) and provides methods to serialize and deserialize parameters. Class declaration:
+The **VStreamerParams** class is used for video stream initialization (the [initVStreamer(...)](#initvstreamer-method) method) or to get all actual parameters (the [getParams(...)](#getparams-method) method). Also, **VStreamerParams** provides a structure to write/read parameters from JSON files, compatible with [ConfigReader](https://rapidpixel.constantrobotics.com/docs/Service/ConfigReader.html), and provides methods to serialize and deserialize parameters. Since 3.2.0 the JSON functions are written out by hand rather than generated by the **JSON_READABLE** macro: that macro is limited to 63 fields and this class carries 69. A key absent from the JSON leaves the corresponding field at its default rather than raising an error. Class declaration:
 
 ```cpp
 class VStreamerParams
@@ -829,21 +845,18 @@ public:
     /// Maximum RTP payload size of the server-delivered stream, integer bytes.
     int serverStreamMaxPayloadSize{1472};
 
-    JSON_READABLE(VStreamerParams, enable, width, height, directStreamIp, rtspPort, rtspsPort, directStreamPort,
-                  webRtcPort, hlsPort, srtPort, rtmpPort, rtmpsPort, metadataPort,
-                  rtspEnable, directStreamEnable, webRtcEnable, hlsEnable, srtEnable,
-                  rtmpEnable, metadataEnable, rtspMulticastIp, rtspMulticastPort,
-                  user, password, suffix, metadataSuffix, minBitrateKbps,
-                  maxBitrateKbps, bitrateKbps, bitrateMode, fps, gop, h264Profile,
-                  jpegQuality, codec, fitMode, overlayEnable, type, custom1,
-                  custom2, custom3, rtspKey, rtspCert, webRtcKey, webRtcCert,
-                  hlsKey, hlsCert, rtmpKey, rtmpCert, rtspEncryption,
-                  webRtcEncryption, rtmpEncryption, hlsEncryption, logLevel,
-                  directStreamType, directStreamBitrateKbps, directStreamMaxPayloadSize,
-                  directStreamPacingMode, serverStreamType, multicastTtl,
-                  securityProfile, publicAddress, bindAddress, rtpPortMin,
-                  rtpPortMax, webRtcMediaPort, corsAllowedOrigin,
-                  serverStreamMaxPayloadSize)
+    /// JSON serialisation, hand-written rather than JSON_READABLE().
+    ///
+    /// The ConfigReader macro forwards to nlohmann's
+    /// NLOHMANN_DEFINE_TYPE_INTRUSIVE, whose expansion is capped at 63 fields;
+    /// this class carries 69, so the macro does not compile here. One
+    /// deliberate difference: a key MISSING from the JSON leaves the field at
+    /// its default instead of throwing, so a configuration file written for an
+    /// older version still loads.
+    ///
+    /// (Bodies elided here -- see VStreamer.h for the full definitions.)
+    friend void to_json(nlohmann::json& j, const VStreamerParams& p);
+    friend void from_json(const nlohmann::json& j, VStreamerParams& p);
 
     /// Serialize parameters.
     bool serialize(uint8_t* data, int bufferSize, int& size,
@@ -925,12 +938,21 @@ public:
 | directStreamMaxPayloadSize | Maximum UDP/RTP payload size for the direct stream, integer bytes. Default **1472**. |
 | directStreamPacingMode | Pacing mode of the direct stream, integer: **0** - target bitrate, **1** - push. |
 | serverStreamType | Transport/type of the **server-delivered** stream — fed to the media server, which fans it out to clients. String whose accepted values are **implementation-defined**: the abstract **VStreamer** interface does not fix them — each concrete video-streamer implementation defines the value set and the meaning of each value, **including whether KLV metadata is carried** (there is no separate KLV flag). Example values: **"rtp"**, **"mpegts"** (and others, depending on implementation). Distinct from **rtspEnable** (protocol enable/disable). Default **"rtp"**. |
+| multicastTtl | Multicast TTL (scope) for **every** multicast leg, integer **[0:255]**: **0** - implementation default. An implementation may cap the value and must document the cap. Default **0**. |
+| securityProfile | Security/compliance profile. String whose accepted values are **implementation-defined**: **""** or **"no"** - the implementation's own default. An unrecognised value **must be rejected**, never mapped to a default. Default **"no"**. |
+| publicAddress | Public (routed) address advertised to clients in SDP and ICE candidate lines instead of the locally detected one, string: **""** or **"no"** - detect automatically. An address **literal**, not a hostname. Default **"no"**. |
+| bindAddress | Local address every listener binds to, string: **""** or **"0.0.0.0"** - every interface. Default **"0.0.0.0"**. |
+| rtpPortMin | Lowest port of the RTP/RTCP range, integer **[0:65534]**: **0** - any ephemeral port. Should be even, because RTCP conventionally takes port+1. Default **0**. |
+| rtpPortMax | Highest port of the RTP/RTCP range, integer **[0:65535]**: **0** - any ephemeral port. Default **0**. |
+| webRtcMediaPort | WebRTC media (UDP) port, integer **[0:65535]**: **0** - the implementation chooses. Distinct from **webRtcPort**, which carries signalling only. Default **0**. |
+| corsAllowedOrigin | Single origin permitted to reach the HTTP-based signalling endpoints, string **"scheme://host[:port]"**: **""** or **"no"** - the implementation's default policy. Default **"no"**. |
+| serverStreamMaxPayloadSize | Maximum RTP payload size of the **server-delivered** stream, integer bytes — the counterpart of **directStreamMaxPayloadSize**. An implementation may clamp it lower. Default **1472**. |
 
 
 
 ## Serialize video streamer parameters
 
-The **VStreamerParams** class provides a method **serialize(...)** to serialize video streamer parameters (fields of the [VStreamerParams](#vstreamerparams-class-description) class). Serialization of video streamer parameters is necessary when you need to send video streamer parameters via communication channels. The method provides options to exclude particular parameters from serialization. To do this, the method inserts a binary mask (8 bytes) where each bit represents a particular parameter and the **deserialize(...)** method recognizes it. Method declaration:
+The **VStreamerParams** class provides a method **serialize(...)** to serialize video streamer parameters (fields of the [VStreamerParams](#vstreamerparams-class-description) class). Serialization of video streamer parameters is necessary when you need to send video streamer parameters via communication channels. The method provides options to exclude particular parameters from serialization. To do this, the method inserts a binary mask (10 bytes) where each bit represents a particular parameter and the **deserialize(...)** method recognizes it. The mask follows a 3-byte header (marker plus major and minor version), so the parameter payload starts at offset 13. The mask grew from 8 bytes to 10 in 3.2.0, which is why a 3.1 peer cannot read a 3.2 message -- **deserialize(...)** rejects it on the version check rather than misreading the offsets. Method declaration:
 
 ```cpp
 bool serialize(uint8_t* data, int bufferSize, int& size, VStreamerParamsMask* mask = nullptr);
@@ -939,7 +961,7 @@ bool serialize(uint8_t* data, int bufferSize, int& size, VStreamerParamsMask* ma
 | Parameter  | Value                                                        |
 | ---------- | ------------------------------------------------------------ |
 | data       | Pointer to data buffer.                                      |
-| bufferSize | Data buffer size. If buffer size smaller than required, buffer will be filled with fewer parameters. |
+| bufferSize | Data buffer size, **minimum 14 bytes** (13-byte header plus one field). Below that the method returns FALSE and sets **size** to 0. Above it, a buffer too small for every selected parameter is filled with as many as fit, and the ones that did not fit are simply absent from the mask. |
 | size       | Size of serialized data.                                     |
 | mask       | Parameters mask - pointer to **VStreamerParamsMask** structure. **VStreamerParamsMask** (declared in VStreamer.h file) determines flags for each field (parameter) declared in **VStreamerParams** class. If the user wants to exclude any parameters from serialization, he can put a pointer to the mask. If the user wants to exclude a particular parameter from serialization, he should set the corresponding flag in the VStreamerParams structure. |
 
@@ -1008,6 +1030,15 @@ struct VStreamerParamsMask
     bool directStreamMaxPayloadSize{true};
     bool directStreamPacingMode{true};
     bool serverStreamType{true};
+    bool multicastTtl{true};
+    bool securityProfile{true};
+    bool publicAddress{true};
+    bool bindAddress{true};
+    bool rtpPortMin{true};
+    bool rtpPortMax{true};
+    bool webRtcMediaPort{true};
+    bool corsAllowedOrigin{true};
+    bool serverStreamMaxPayloadSize{true};
 };
 ```
 
@@ -1059,6 +1090,14 @@ bool deserialize(uint8_t* data, int dataSize);
 | --------- | ------------- |
 | data      | Pointer to serialized data buffer. |
 | dataSize  | Size of data. |
+
+**deserialize(...)** replaces the WHOLE object: every parameter whose mask bit
+is clear is reset to a zero value (**0**, **false** or an empty string) in the
+destination, not left at whatever it held before. It is not a partial update,
+so deserialize into a fresh **VStreamerParams** unless you intend the excluded
+fields to be cleared. The method also refuses a buffer shorter than 14 bytes, a
+foreign header byte, and any message whose major **or minor** version differs
+from the library's own.
 
 **Returns:** TRUE if data is deserialized or FALSE if not.
 

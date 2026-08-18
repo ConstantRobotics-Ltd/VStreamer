@@ -450,6 +450,9 @@ public:
 
     /**
      * @brief Deserialize parameters.
+     * @note Replaces the WHOLE object: every parameter whose mask bit is clear
+     *       is reset to 0 / false / "" rather than left untouched. This is not
+     *       a partial update.
      * @param data Pointer to data.
      * @param dataSize Size of data.
      * @return TRUE if parameters deserialized or FALSE if not.
