@@ -269,170 +269,76 @@ public:
     int serverStreamMaxPayloadSize{1472};
 
     /// JSON serialisation.
-    ///
-    /// Hand-written rather than JSON_READABLE(): that macro forwards to
-    /// nlohmann's NLOHMANN_DEFINE_TYPE_INTRUSIVE, whose expansion is capped at
-    /// 63 fields, and 3.2 takes the structure past it. Patching the vendored
-    /// amalgamated nlohmann header instead would be undone by its next update.
-    ///
-    /// One deliberate difference from the macro: a key MISSING from the JSON
-    /// leaves the field at its default instead of throwing. The macro's `.at()`
-    /// meant a configuration file that did not list every single parameter
-    /// failed to load at all -- so a file written for 3.1 could not be read by
-    /// 3.2, which is precisely when a deployment needs it to be.
-    template<typename J, typename T>
-    static void get(const J& j, const char* key, T& out)
-    {
-        const auto it = j.find(key);
-        if (it != j.end() && !it->is_null())
-            it->template get_to(out);
-    }
-
-    friend void to_json(nlohmann::json& j, const VStreamerParams& p)
-    {
-        j["enable"] = p.enable;
-        j["width"] = p.width;
-        j["height"] = p.height;
-        j["directStreamIp"] = p.directStreamIp;
-        j["rtspPort"] = p.rtspPort;
-        j["rtspsPort"] = p.rtspsPort;
-        j["directStreamPort"] = p.directStreamPort;
-        j["webRtcPort"] = p.webRtcPort;
-        j["hlsPort"] = p.hlsPort;
-        j["srtPort"] = p.srtPort;
-        j["rtmpPort"] = p.rtmpPort;
-        j["rtmpsPort"] = p.rtmpsPort;
-        j["metadataPort"] = p.metadataPort;
-        j["rtspEnable"] = p.rtspEnable;
-        j["directStreamEnable"] = p.directStreamEnable;
-        j["webRtcEnable"] = p.webRtcEnable;
-        j["hlsEnable"] = p.hlsEnable;
-        j["srtEnable"] = p.srtEnable;
-        j["rtmpEnable"] = p.rtmpEnable;
-        j["metadataEnable"] = p.metadataEnable;
-        j["rtspMulticastIp"] = p.rtspMulticastIp;
-        j["rtspMulticastPort"] = p.rtspMulticastPort;
-        j["user"] = p.user;
-        j["password"] = p.password;
-        j["suffix"] = p.suffix;
-        j["metadataSuffix"] = p.metadataSuffix;
-        j["minBitrateKbps"] = p.minBitrateKbps;
-        j["maxBitrateKbps"] = p.maxBitrateKbps;
-        j["bitrateKbps"] = p.bitrateKbps;
-        j["bitrateMode"] = p.bitrateMode;
-        j["fps"] = p.fps;
-        j["gop"] = p.gop;
-        j["h264Profile"] = p.h264Profile;
-        j["jpegQuality"] = p.jpegQuality;
-        j["codec"] = p.codec;
-        j["fitMode"] = p.fitMode;
-        j["cycleTimeUs"] = p.cycleTimeUs;
-        j["overlayEnable"] = p.overlayEnable;
-        j["type"] = p.type;
-        j["custom1"] = p.custom1;
-        j["custom2"] = p.custom2;
-        j["custom3"] = p.custom3;
-        j["rtspKey"] = p.rtspKey;
-        j["rtspCert"] = p.rtspCert;
-        j["webRtcKey"] = p.webRtcKey;
-        j["webRtcCert"] = p.webRtcCert;
-        j["hlsKey"] = p.hlsKey;
-        j["hlsCert"] = p.hlsCert;
-        j["rtmpKey"] = p.rtmpKey;
-        j["rtmpCert"] = p.rtmpCert;
-        j["rtspEncryption"] = p.rtspEncryption;
-        j["webRtcEncryption"] = p.webRtcEncryption;
-        j["rtmpEncryption"] = p.rtmpEncryption;
-        j["hlsEncryption"] = p.hlsEncryption;
-        j["logLevel"] = p.logLevel;
-        j["directStreamType"] = p.directStreamType;
-        j["directStreamBitrateKbps"] = p.directStreamBitrateKbps;
-        j["directStreamMaxPayloadSize"] = p.directStreamMaxPayloadSize;
-        j["directStreamPacingMode"] = p.directStreamPacingMode;
-        j["serverStreamType"] = p.serverStreamType;
-        j["multicastTtl"] = p.multicastTtl;
-        j["securityProfile"] = p.securityProfile;
-        j["publicAddress"] = p.publicAddress;
-        j["bindAddress"] = p.bindAddress;
-        j["rtpPortMin"] = p.rtpPortMin;
-        j["rtpPortMax"] = p.rtpPortMax;
-        j["webRtcMediaPort"] = p.webRtcMediaPort;
-        j["corsAllowedOrigin"] = p.corsAllowedOrigin;
-        j["serverStreamMaxPayloadSize"] = p.serverStreamMaxPayloadSize;
-    }
-
-    friend void from_json(const nlohmann::json& j, VStreamerParams& p)
-    {
-        get(j, "enable", p.enable);
-        get(j, "width", p.width);
-        get(j, "height", p.height);
-        get(j, "directStreamIp", p.directStreamIp);
-        get(j, "rtspPort", p.rtspPort);
-        get(j, "rtspsPort", p.rtspsPort);
-        get(j, "directStreamPort", p.directStreamPort);
-        get(j, "webRtcPort", p.webRtcPort);
-        get(j, "hlsPort", p.hlsPort);
-        get(j, "srtPort", p.srtPort);
-        get(j, "rtmpPort", p.rtmpPort);
-        get(j, "rtmpsPort", p.rtmpsPort);
-        get(j, "metadataPort", p.metadataPort);
-        get(j, "rtspEnable", p.rtspEnable);
-        get(j, "directStreamEnable", p.directStreamEnable);
-        get(j, "webRtcEnable", p.webRtcEnable);
-        get(j, "hlsEnable", p.hlsEnable);
-        get(j, "srtEnable", p.srtEnable);
-        get(j, "rtmpEnable", p.rtmpEnable);
-        get(j, "metadataEnable", p.metadataEnable);
-        get(j, "rtspMulticastIp", p.rtspMulticastIp);
-        get(j, "rtspMulticastPort", p.rtspMulticastPort);
-        get(j, "user", p.user);
-        get(j, "password", p.password);
-        get(j, "suffix", p.suffix);
-        get(j, "metadataSuffix", p.metadataSuffix);
-        get(j, "minBitrateKbps", p.minBitrateKbps);
-        get(j, "maxBitrateKbps", p.maxBitrateKbps);
-        get(j, "bitrateKbps", p.bitrateKbps);
-        get(j, "bitrateMode", p.bitrateMode);
-        get(j, "fps", p.fps);
-        get(j, "gop", p.gop);
-        get(j, "h264Profile", p.h264Profile);
-        get(j, "jpegQuality", p.jpegQuality);
-        get(j, "codec", p.codec);
-        get(j, "fitMode", p.fitMode);
-        get(j, "cycleTimeUs", p.cycleTimeUs);
-        get(j, "overlayEnable", p.overlayEnable);
-        get(j, "type", p.type);
-        get(j, "custom1", p.custom1);
-        get(j, "custom2", p.custom2);
-        get(j, "custom3", p.custom3);
-        get(j, "rtspKey", p.rtspKey);
-        get(j, "rtspCert", p.rtspCert);
-        get(j, "webRtcKey", p.webRtcKey);
-        get(j, "webRtcCert", p.webRtcCert);
-        get(j, "hlsKey", p.hlsKey);
-        get(j, "hlsCert", p.hlsCert);
-        get(j, "rtmpKey", p.rtmpKey);
-        get(j, "rtmpCert", p.rtmpCert);
-        get(j, "rtspEncryption", p.rtspEncryption);
-        get(j, "webRtcEncryption", p.webRtcEncryption);
-        get(j, "rtmpEncryption", p.rtmpEncryption);
-        get(j, "hlsEncryption", p.hlsEncryption);
-        get(j, "logLevel", p.logLevel);
-        get(j, "directStreamType", p.directStreamType);
-        get(j, "directStreamBitrateKbps", p.directStreamBitrateKbps);
-        get(j, "directStreamMaxPayloadSize", p.directStreamMaxPayloadSize);
-        get(j, "directStreamPacingMode", p.directStreamPacingMode);
-        get(j, "serverStreamType", p.serverStreamType);
-        get(j, "multicastTtl", p.multicastTtl);
-        get(j, "securityProfile", p.securityProfile);
-        get(j, "publicAddress", p.publicAddress);
-        get(j, "bindAddress", p.bindAddress);
-        get(j, "rtpPortMin", p.rtpPortMin);
-        get(j, "rtpPortMax", p.rtpPortMax);
-        get(j, "webRtcMediaPort", p.webRtcMediaPort);
-        get(j, "corsAllowedOrigin", p.corsAllowedOrigin);
-        get(j, "serverStreamMaxPayloadSize", p.serverStreamMaxPayloadSize);
-    }
+    JSON_READABLE(VStreamerParams,
+                  enable,
+                  width,
+                  height,
+                  directStreamIp,
+                  rtspPort,
+                  rtspsPort,
+                  directStreamPort,
+                  webRtcPort,
+                  hlsPort,
+                  srtPort,
+                  rtmpPort,
+                  rtmpsPort,
+                  metadataPort,
+                  rtspEnable,
+                  directStreamEnable,
+                  webRtcEnable,
+                  hlsEnable,
+                  srtEnable,
+                  rtmpEnable,
+                  metadataEnable,
+                  rtspMulticastIp,
+                  rtspMulticastPort,
+                  user,
+                  password,
+                  suffix,
+                  metadataSuffix,
+                  minBitrateKbps,
+                  maxBitrateKbps,
+                  bitrateKbps,
+                  bitrateMode,
+                  fps,
+                  gop,
+                  h264Profile,
+                  jpegQuality,
+                  codec,
+                  fitMode,
+                  cycleTimeUs,
+                  overlayEnable,
+                  type,
+                  custom1,
+                  custom2,
+                  custom3,
+                  rtspKey,
+                  rtspCert,
+                  webRtcKey,
+                  webRtcCert,
+                  hlsKey,
+                  hlsCert,
+                  rtmpKey,
+                  rtmpCert,
+                  rtspEncryption,
+                  webRtcEncryption,
+                  rtmpEncryption,
+                  hlsEncryption,
+                  logLevel,
+                  directStreamType,
+                  directStreamBitrateKbps,
+                  directStreamMaxPayloadSize,
+                  directStreamPacingMode,
+                  serverStreamType,
+                  multicastTtl,
+                  securityProfile,
+                  publicAddress,
+                  bindAddress,
+                  rtpPortMin,
+                  rtpPortMax,
+                  webRtcMediaPort,
+                  corsAllowedOrigin,
+                  serverStreamMaxPayloadSize)
 
     /**
      * @brief Serialize parameters.

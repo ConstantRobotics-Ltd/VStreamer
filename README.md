@@ -4,7 +4,7 @@
 
 # **VStreamer interface C++ library**
 
-**v3.2.0**
+**v3.3.0**
 
 
 
@@ -64,6 +64,7 @@ The **VStreamer** C++ library provides a standard interface and defines data str
 | 3.0.0   | 17.06.2026   | - **Breaking parameter rename** for a clear two-leg model: `ip`→**directStreamIp**, `rtpPort`→**directStreamPort**, `rtpEnable`→**directStreamEnable**; `rtspStreamMode`→**serverStreamType**. Direct-stream params keep the `directStream*` prefix.<br/>- **directStreamType** and **serverStreamType** are **string** values whose accepted set is implementation-defined (each concrete video streamer defines the values and their meaning, including whether KLV metadata is carried; for example `"rtp"`, `"mpegts"`).<br/>- The direct stream is transport-agnostic (its own IP/port, not RTP-specific). |
 | 3.1.0   | 18.06.2026   | - Removed **KlvMode** parameter. |
 | 3.2.0   | 17.08.2026   | - Added new parameters. |
+| 3.3.0   | 17.08.2026   | - ConfigReader submodule updated. |
 
 
 
@@ -845,18 +846,8 @@ public:
     /// Maximum RTP payload size of the server-delivered stream, integer bytes.
     int serverStreamMaxPayloadSize{1472};
 
-    /// JSON serialisation, hand-written rather than JSON_READABLE().
-    ///
-    /// The ConfigReader macro forwards to nlohmann's
-    /// NLOHMANN_DEFINE_TYPE_INTRUSIVE, whose expansion is capped at 63 fields;
-    /// this class carries 69, so the macro does not compile here. One
-    /// deliberate difference: a key MISSING from the JSON leaves the field at
-    /// its default instead of throwing, so a configuration file written for an
-    /// older version still loads.
-    ///
-    /// (Bodies elided here -- see VStreamer.h for the full definitions.)
-    friend void to_json(nlohmann::json& j, const VStreamerParams& p);
-    friend void from_json(const nlohmann::json& j, VStreamerParams& p);
+    /// JSON serialisation.
+    JSON_READABLE(VStreamerParams, ...)
 
     /// Serialize parameters.
     bool serialize(uint8_t* data, int bufferSize, int& size,
