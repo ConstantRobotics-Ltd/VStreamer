@@ -10,7 +10,7 @@ using namespace std;
 
 
 // Fill random data.
-void fillRandomData(VStreamerParams &a)
+static void fillRandomData(VStreamerParams &a)
 {
     a.enable = false;
     a.width = rand() % 65535 + 1;
@@ -42,7 +42,7 @@ void fillRandomData(VStreamerParams &a)
     a.maxBitrateKbps = rand() % 65535 + 1;
     a.bitrateKbps = rand() % 65535 + 1;
     a.bitrateMode = rand() % 65535 + 1;
-    a.fps = rand() % 65535 + 1;
+    a.fps = static_cast<float>(rand() % 65535 + 1);
     a.gop = rand() % 65535 + 1;
     a.h264Profile = rand() % 65535 + 1;
     a.jpegQuality = rand() % 65535 + 1;
@@ -51,9 +51,9 @@ void fillRandomData(VStreamerParams &a)
     a.cycleTimeUs = rand() % 65535 + 1;
     a.overlayEnable = true;
     a.type = rand() % 65535 + 1;
-    a.custom1 = rand() % 65535 + 1;
-    a.custom2 = rand() % 65535 + 1;
-    a.custom3 = rand() % 65535 + 1;
+    a.custom1 = static_cast<float>(rand() % 65535 + 1);
+    a.custom2 = static_cast<float>(rand() % 65535 + 1);
+    a.custom3 = static_cast<float>(rand() % 65535 + 1);
     a.rtspKey = "dh;skcsf";
     a.rtspCert = "lkjrkjg";
     a.webRtcKey = "WERUHUHFE";
@@ -578,7 +578,7 @@ bool encodeDecodeCommandsTest()
     // Encode command.
     uint8_t data[1024];
     int size = 0;
-    float outValue = (float)(rand() % 20);
+    float outValue = static_cast<float>(rand() % 20);
     VStreamer::encodeCommand(data, size, VStreamerCommand::RESTART);
 
     // Decode command.
@@ -600,7 +600,7 @@ bool encodeDecodeCommandsTest()
     }
 
     // Encode param.
-    outValue = (float)(rand() % 20);
+    outValue = static_cast<float>(rand() % 20);
     VStreamer::encodeSetParamCommand(data, size, VStreamerParam::WIDTH, outValue);
 
     // Decode command.
@@ -635,7 +635,7 @@ bool encodeDecodeCommandsTest()
         VStreamerParam::SERVER_STREAM_MAX_PAYLOAD};
     for (VStreamerParam id : numericIds)
     {
-        outValue = (float)(rand() % 30000);
+        outValue = static_cast<float>(rand() % 30000);
         VStreamer::encodeSetParamCommand(data, size, id, outValue);
         value = 0.0f;
         strValue = "";
@@ -704,21 +704,21 @@ bool encodeDecodeCommandsTest()
             return false;
         }
 
-        buf[2] = (uint8_t)(buf[2] + 1);         // a different minor version
+        buf[2] = static_cast<uint8_t>(buf[2] + 1);         // a different minor version
         VStreamerParams other;
         if (other.deserialize(buf, n))
         {
             cout << "a foreign minor version was accepted" << endl;
             return false;
         }
-        buf[2] = (uint8_t)(buf[2] - 1);
-        buf[1] = (uint8_t)(buf[1] + 1);         // a different major version
+        buf[2] = static_cast<uint8_t>(buf[2] - 1);
+        buf[1] = static_cast<uint8_t>(buf[1] + 1);         // a different major version
         if (other.deserialize(buf, n))
         {
             cout << "a foreign major version was accepted" << endl;
             return false;
         }
-        buf[1] = (uint8_t)(buf[1] - 1);
+        buf[1] = static_cast<uint8_t>(buf[1] - 1);
         buf[0] = 0x03;                          // not a params message at all
         if (other.deserialize(buf, n))
         {
@@ -732,9 +732,18 @@ bool encodeDecodeCommandsTest()
         for (int cut = 0; cut < n; ++cut)
         {
             VStreamerParams t;
+            fillRandomData(t);
+            VStreamerParams before = t;
             if (t.deserialize(buf, cut))
             {
                 cout << "a truncated params message was accepted at "
+                     << cut << " of " << n << endl;
+                return false;
+            }
+            // A refused message leaves the object exactly as it was.
+            if (!compareParams(before, t))
+            {
+                cout << "a refused params message changed the object at "
                      << cut << " of " << n << endl;
                 return false;
             }
@@ -793,7 +802,7 @@ bool encodeDecodeCommandsTest()
     // 511-byte cap and accepted both.
     {
         uint8_t raw[16] = {0x03, 3, 2};
-        int id = (int)VStreamerParam::CODEC;
+        int id = static_cast<int>(VStreamerParam::CODEC);
         memcpy(&raw[3], &id, 4);
         raw[7] = 'A'; raw[8] = 'B'; raw[9] = 'C';   // no terminator
         if (VStreamer::decodeCommand(raw, 10, paramId, commandId,
@@ -810,7 +819,7 @@ bool encodeDecodeCommandsTest()
             return false;
         }
         uint8_t cmd[8] = {0x00, 3, 2};
-        int cid = (int)VStreamerCommand::RESTART;
+        int cid = static_cast<int>(VStreamerCommand::RESTART);
         memcpy(&cmd[3], &cid, 4);
         cmd[7] = 0xFF;                              // COMMAND is exactly 7 bytes
         if (VStreamer::decodeCommand(cmd, 8, paramId, commandId,
@@ -827,7 +836,7 @@ bool encodeDecodeCommandsTest()
     {
         VStreamerParams p;
         p.enable = true;
-        VStreamerParamsMask mask{};   // all false
+        VStreamerParamsMask mask{};   // every flag is set by default: only enable fits
         mask.enable = true;
         uint8_t tiny[14];
         int n = 0;

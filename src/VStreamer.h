@@ -342,6 +342,10 @@ public:
 
     /**
      * @brief Serialize parameters.
+     * @note Integers and floats are stored in the byte order of the host: the
+     *       data is meant for hosts of the same byte order. A string must not
+     *       contain a NUL byte: deserialize() reads it up to the first one and
+     *       the fields after it are read shifted.
      * @param data Pointer to data buffer. Must be at least 14 bytes (13-byte
      *             header plus one bool field); if smaller than the size
      *             required for all selected parameters, fewer parameters are
@@ -361,7 +365,8 @@ public:
      *       a partial update.
      * @param data Pointer to data.
      * @param dataSize Size of data.
-     * @return TRUE if parameters deserialized or FALSE if not.
+     * @return TRUE if parameters deserialized or FALSE if not. When FALSE
+     *         the object is left exactly as it was.
      */
     bool deserialize(uint8_t* data, int dataSize);
 };
@@ -647,7 +652,9 @@ public:
      * @param data Pointer to data buffer. Must have size >= 8 + value.size()
      *             (3-byte header + 4-byte param ID + the string and its null
      *             terminator).
-     * @param size Size of encoded data.
+     * @param size Size of encoded data. 0, and nothing is written, if @p data
+     *             is null or the value is longer than INT_MAX - 8 bytes (the
+     *             size would not fit an int).
      * @param id Parameter ID.
      * @param value Parameter value.
      */

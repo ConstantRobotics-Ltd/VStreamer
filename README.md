@@ -4,7 +4,7 @@
 
 # **VStreamer interface C++ library**
 
-**v3.3.0**
+**v3.3.1**
 
 
 
@@ -65,6 +65,7 @@ The **VStreamer** C++ library provides a standard interface and defines data str
 | 3.1.0   | 18.06.2026   | - Removed **KlvMode** parameter. |
 | 3.2.0   | 17.08.2026   | - Added new parameters. |
 | 3.3.0   | 17.08.2026   | - ConfigReader submodule updated. |
+| 3.3.1   | 09.10.2026   | Hardening of **serialize(...)**, **deserialize(...)** and **encodeSetParamCommand(...)**. The public interface and the wire format are unchanged; the behaviour changes are marked.<br />- Behaviour change: **deserialize(...)** applies a message as a whole or not at all: a truncated field or a string without its terminator leaves the object as it was (before, the fields read up to the error were already overwritten).<br />- Behaviour change: **encodeSetParamCommand(...)** with a string longer than INT_MAX - 8 bytes sets **size** to 0 and writes nothing (before, the size overflowed).<br />- Size arithmetic of **serialize(...)** and **deserialize(...)** cannot overflow for any buffer size or string length. |
 
 
 
@@ -336,7 +337,7 @@ static void encodeSetParamCommand(uint8_t* data, int& size, VStreamerParam id, s
 | Parameter | Description                                                  |
 | --------- | ------------------------------------------------------------ |
 | data      | Pointer to data buffer for encoded command. For the float overload must have size >= 11. For the string overload must have size >= 8 + value.size() (3-byte header + 4-byte parameter ID + the string content + null terminator). |
-| size      | Size of encoded data. 11 bytes for the float overload; 8 + value.size() bytes for the string overload (minimum 8 bytes for an empty string). |
+| size      | Size of encoded data. 11 bytes for the float overload; 8 + value.size() bytes for the string overload (minimum 8 bytes for an empty string). 0, and nothing is written, if **data** is null or the string is longer than INT_MAX - 8 bytes. |
 | id        | Parameter ID according to [VStreamerParam](#vstreamerparam-enum) enum. |
 | value     | Numeric video streamer parameter value. Only for non-string parameters. For string parameters (see [VStreamerParam](#vstreamerparam-enum) enum) this parameter may have any value. |
 | value     | String parameter value (see [VStreamerParam](#vstreamerparam-enum) enum). |
@@ -349,7 +350,7 @@ uint8_t data[11];
 // Size of encoded data.
 int size = 0;
 // Random parameter value.
-float outValue = (float)(rand() % 20);
+float outValue = static_cast<float>(rand() % 20);
 // Encode command.
 VStreamer::encodeSetParamCommand(data, size, VStreamerParam::CUSTOM1, outValue);
 ```
@@ -943,7 +944,7 @@ public:
 
 ## Serialize video streamer parameters
 
-The **VStreamerParams** class provides a method **serialize(...)** to serialize video streamer parameters (fields of the [VStreamerParams](#vstreamerparams-class-description) class). Serialization of video streamer parameters is necessary when you need to send video streamer parameters via communication channels. The method provides options to exclude particular parameters from serialization. To do this, the method inserts a binary mask (10 bytes) where each bit represents a particular parameter and the **deserialize(...)** method recognizes it. The mask follows a 3-byte header (marker plus major and minor version), so the parameter payload starts at offset 13. The mask grew from 8 bytes to 10 in 3.2.0, which is why a 3.1 peer cannot read a 3.2 message -- **deserialize(...)** rejects it on the version check rather than misreading the offsets. Method declaration:
+The **VStreamerParams** class provides a method **serialize(...)** to serialize video streamer parameters (fields of the [VStreamerParams](#vstreamerparams-class-description) class). Serialization of video streamer parameters is necessary when you need to send video streamer parameters via communication channels. The method provides options to exclude particular parameters from serialization. To do this, the method inserts a binary mask (10 bytes) where each bit represents a particular parameter and the **deserialize(...)** method recognizes it. Integers and floats are stored in the **byte order of the host** that serializes them: the data is meant for hosts of the same byte order, and a consumer of the other order reads wrong values. A string must not contain a NUL byte: **deserialize(...)** reads it up to the first one and the fields after it are read shifted. The mask follows a 3-byte header (marker plus major and minor version), so the parameter payload starts at offset 13. The mask grew from 8 bytes to 10 in 3.2.0, which is why a 3.1 peer cannot read a 3.2 message -- **deserialize(...)** rejects it on the version check rather than misreading the offsets. Method declaration:
 
 ```cpp
 bool serialize(uint8_t* data, int bufferSize, int& size, VStreamerParamsMask* mask = nullptr);
@@ -1088,7 +1089,9 @@ destination, not left at whatever it held before. It is not a partial update,
 so deserialize into a fresh **VStreamerParams** unless you intend the excluded
 fields to be cleared. The method also refuses a buffer shorter than 14 bytes, a
 foreign header byte, and any message whose major **or minor** version differs
-from the library's own.
+from the library's own. A message is applied as a whole or not at all: when
+the method returns FALSE (a truncated field, a string without its terminator)
+the object is exactly as it was before the call.
 
 **Returns:** TRUE if data is deserialized or FALSE if not.
 
