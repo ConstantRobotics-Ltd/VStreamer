@@ -65,7 +65,7 @@ The **VStreamer** C++ library provides a standard interface and defines data str
 | 3.1.0   | 18.06.2026   | - Removed **KlvMode** parameter. |
 | 3.2.0   | 17.08.2026   | - Added new parameters. |
 | 3.3.0   | 17.08.2026   | - ConfigReader submodule updated. |
-| 3.3.1   | 09.10.2026   | Hardening of **serialize(...)**, **deserialize(...)** and **encodeSetParamCommand(...)**. The public interface and the wire format are unchanged; the behaviour changes are marked.<br />- Behaviour change: **deserialize(...)** applies a message as a whole or not at all: a truncated field or a string without its terminator leaves the object as it was (before, the fields read up to the error were already overwritten).<br />- Behaviour change: **encodeSetParamCommand(...)** with a string longer than INT_MAX - 8 bytes sets **size** to 0 and writes nothing (before, the size overflowed).<br />- Size arithmetic of **serialize(...)** and **deserialize(...)** cannot overflow for any buffer size or string length. |
+| 3.3.1   | 09.10.2026   | Deep code review.<br />- Behavior change: **deserialize(...)** applies a message as a whole or not at all: a truncated field or a string without its terminator leaves the object as it was (before, the fields read up to the error were already overwritten).<br />- Behavior change: **encodeSetParamCommand(...)** with a string longer than INT_MAX - 8 bytes sets **size** to 0 and writes nothing (before, the size overflowed).<br />- Size arithmetic of **serialize(...)** and **deserialize(...)** cannot overflow for any buffer size or string length. |
 
 
 
