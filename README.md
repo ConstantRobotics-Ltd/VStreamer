@@ -4,7 +4,7 @@
 
 # **VStreamer interface C++ library**
 
-**v3.3.1**
+**v3.3.2**
 
 
 
@@ -36,13 +36,17 @@
   - [Deserialize video streamer parameters](#deserialize-video-streamer-parameters)
   - [Read parameters from JSON file and write to JSON file](#read-parameters-from-json-file-and-write-to-json-file)
 - [Build and connect to your project](#build-and-connect-to-your-project)
+  - [Build stand alone](#build-stand-alone)
+  - [CMake options](#cmake-options)
+  - [Connect to your project](#connect-to-your-project)
+- [Portability](#portability)
 - [How to make custom implementation](#how-to-make-custom-implementation)
 
 
 
 # Overview
 
-The **VStreamer** C++ library provides a standard interface and defines data structures and rules for different video stream classes. The **VStreamer** interface class does not perform any operations by itself; it only provides an interface and methods to encode/decode commands and serialize/deserialize parameters. The **VStreamer** class also provides data structures for video stream parameters. Different video stream classes inherit the interface from the **VStreamer** C++ class. The **VStreamer.h** file contains a list of data structures ([VStreamerCommand](#vstreamercommand-enum) enum, [VStreamerParam](#vstreamerparam-enum) enum and [VStreamerParams](#vstreamerparams-class-description) class). The [VStreamerParams](#vstreamerparams-class-description) class contains all streamer parameters and includes methods to serialize and deserialize parameters. The [VStreamerCommand](#vstreamercommand-enum) enum contains IDs of commands supported by the **VStreamer** class. The [VStreamerParam](#vstreamerparam-enum) enum contains IDs of parameters supported by the **VStreamer** class. All video streamers should include parameters and commands listed in the **VStreamer.h** file. The **VStreamer** interface class depends on: [ConfigReader](https://rapidpixel.constantrobotics.com/docs/Service/ConfigReader.html) library (provides methods to read/write JSON config files, source code included, Apache 2.0 license), [VCodec](https://rapidpixel.constantrobotics.com/docs/VideoCoding/VCodec.html) library (provides interface for video codecs, source code included, Apache 2.0 license), [VOverlay](https://rapidpixel.constantrobotics.com/docs/Service/VOverlay.html) library (provides interface for overlay engines, source code included, Apache 2.0 license). The library is licensed under the **Apache 2.0** license.
+The **VStreamer** C++ library provides a standard interface and defines data structures and rules for different video stream classes. The **VStreamer** interface class does not perform any operations by itself; it only provides an interface and methods to encode/decode commands and serialize/deserialize parameters. The **VStreamer** class also provides data structures for video stream parameters. Different video stream classes inherit the interface from the **VStreamer** C++ class. The **VStreamer.h** file contains a list of data structures ([VStreamerCommand](#vstreamercommand-enum) enum, [VStreamerParam](#vstreamerparam-enum) enum and [VStreamerParams](#vstreamerparams-class-description) class). The [VStreamerParams](#vstreamerparams-class-description) class contains all streamer parameters and includes methods to serialize and deserialize parameters. The [VStreamerCommand](#vstreamercommand-enum) enum contains IDs of commands supported by the **VStreamer** class. The [VStreamerParam](#vstreamerparam-enum) enum contains IDs of parameters supported by the **VStreamer** class. All video streamers should include parameters and commands listed in the **VStreamer.h** file. The **VStreamer** interface class depends on: [ConfigReader](https://rapidpixel.constantrobotics.com/docs/Service/ConfigReader.html) library (provides methods to read/write JSON config files), [VCodec](https://rapidpixel.constantrobotics.com/docs/VideoCoding/VCodec.html) library (provides interface for video codecs), [VOverlay](https://rapidpixel.constantrobotics.com/docs/Service/VOverlay.html) library (provides interface for overlay engines) and **Frame** library (describes video frame, used by **VCodec**, **VOverlay** and the **sendFrame(...)** method). The repository doesn't contain the source code of these libraries (see [Build and connect to your project](#build-and-connect-to-your-project)).
 
 
 
@@ -66,6 +70,7 @@ The **VStreamer** C++ library provides a standard interface and defines data str
 | 3.2.0   | 17.08.2026   | - Added new parameters. |
 | 3.3.0   | 17.08.2026   | - ConfigReader submodule updated. |
 | 3.3.1   | 09.10.2026   | Deep code review.<br />- Behavior change: **deserialize(...)** applies a message as a whole or not at all: a truncated field or a string without its terminator leaves the object as it was (before, the fields read up to the error were already overwritten).<br />- Behavior change: **encodeSetParamCommand(...)** with a string longer than INT_MAX - 8 bytes sets **size** to 0 and writes nothing (before, the size overflowed).<br />- Size arithmetic of **serialize(...)** and **deserialize(...)** cannot overflow for any buffer size or string length. |
+| 3.3.2   | 17.10.2026   | - Sub-repositories excluded: **Frame**, **ConfigReader**, **VOverlay** and **VCodec** must be placed next to the library repository.<br />- Method **decodeCommand(...)** rejects unknown command and parameter IDs and doesn't change output arguments if it returns -1.<br />- Method **deserialize(...)** accepts data with empty mask (13 bytes) and rejects data with mask bits of unknown fields.<br />- Method **serialize(...)** skips a string which contains a NUL character, method **encodeSetParamCommand(...)** doesn't encode such a string.<br />- Methods **serialize(...)** and **deserialize(...)** use one table of fields (the format of the data is the same).<br />- Fixed description of the JSON functions and of the JSON file example.<br />- Compiler warning options and security options added to CMake files.<br />- Example of custom video streamer is thread-safe and checks values.<br />- Test application extended. |
 
 
 
@@ -75,11 +80,6 @@ The library is supplied as source code only. The user receives the files as a CM
 
 ```xml
 CMakeLists.txt ------------------- Main CMake file of the library.
-3rdparty ------------------------- Folder with third-party libraries.
-    CMakeLists.txt --------------- CMake file to include third-party libraries.
-    ConfigReader ----------------- Folder with ConfigReader library source code.
-    VCodec ----------------------- Folder with VCodec library source code.
-    VOverlay --------------------- Folder with VOverlay library source code.
 example -------------------------- Folder with simple example of VStreamer implementation.
     CMakeLists.txt --------------- CMake file for example custom video streamer class.
     CustomVStreamer.cpp ---------- C++ implementation file.
@@ -123,9 +123,9 @@ public:
     static std::string getVersion();
 
     /// Initialize video streamer.
-    virtual bool initVStreamer(VStreamerParams &params,
-                               VCodec *codec = nullptr,
-                               VOverlay *overlay = nullptr) = 0;
+    virtual bool initVStreamer(VStreamerParams& params,
+                               VCodec* codec = nullptr,
+                               VOverlay* overlay = nullptr) = 0;
 
     /// Get initialization status.
     virtual bool isVStreamerInit() = 0;
@@ -134,12 +134,13 @@ public:
     virtual void closeVStreamer() = 0;
 
     /// Send frame to video streamer.
-    virtual bool sendFrame(Frame& frame, uint8_t* userData = nullptr, int userDataSize = 0) = 0;
+    virtual bool sendFrame(Frame& frame, uint8_t* userData = nullptr,
+                           int userDataSize = 0) = 0;
 
-    /// Set video streamer parameter.
+    /// Set video streamer parameter with a numeric value.
     virtual bool setParam(VStreamerParam id, float value) = 0;
 
-    /// Set video streamer parameter.
+    /// Set video streamer parameter with a string value.
     virtual bool setParam(VStreamerParam id, std::string value) = 0;
 
     /// Get video streamer params structure.
@@ -151,15 +152,15 @@ public:
     /// Decode and execute command.
     virtual bool decodeAndExecuteCommand(uint8_t* data, int size);
 
-    /// Encode set parameter command.
-    static void encodeSetParamCommand(uint8_t *data, int &size, 
-                                        VStreamerParam id, float value);
+    /// Encode set parameter command with a numeric value.
+    static void encodeSetParamCommand(uint8_t* data, int& size,
+                                      VStreamerParam id, float value);
 
-    /// Encode set parameter command.
-    static void encodeSetParamCommand(uint8_t* data, int& size, 
-                                        VStreamerParam id, std::string value);
+    /// Encode set parameter command with a string value.
+    static void encodeSetParamCommand(uint8_t* data, int& size,
+                                      VStreamerParam id, std::string value);
 
-    /// Encode command.
+    /// Encode action command.
     static void encodeCommand(uint8_t* data, int& size, VStreamerCommand id);
 
     /// Decode command.
@@ -170,6 +171,22 @@ public:
                              float& value,
                              std::string& strValue);
 
+protected:
+
+    /// Default constructor. The class can be used as a base only.
+    VStreamer() = default;
+
+    /// Copy constructor.
+    VStreamer(const VStreamer& src) = default;
+
+    /// Move constructor.
+    VStreamer(VStreamer&& src) = default;
+
+    /// Copy assignment operator.
+    VStreamer& operator=(const VStreamer& src) = default;
+
+    /// Move assignment operator.
+    VStreamer& operator=(VStreamer&& src) = default;
 };
 }
 }
@@ -188,13 +205,14 @@ static std::string getVersion();
 The method can be used without a **VStreamer** class instance:
 
 ```cpp
-std::cout << "VStreamer class version: " << VStreamer::getVersion();
+std::cout << "VStreamer class version: " << cr::video::VStreamer::getVersion()
+          << std::endl;
 ```
 
 Console output:
 
 ```bash
-VStreamer class version: 3.2.0
+VStreamer class version: 3.3.2
 ```
 
 
@@ -204,14 +222,14 @@ VStreamer class version: 3.2.0
 The **initVStreamer(...)** method initializes the video streamer with a structure of parameters. Method declaration:
 
 ```cpp
-virtual bool initVStreamer(VStreamerParams &params,
-                           VCodec *codec = nullptr,
-                           VOverlay *overlay = nullptr) = 0;
+virtual bool initVStreamer(VStreamerParams& params,
+                           VCodec* codec = nullptr,
+                           VOverlay* overlay = nullptr) = 0;
 ```
 
 | Parameter | Value                                                        |
 | --------- | ------------------------------------------------------------ |
-| params    | [VStreamerParams](#vstreamerparams-class-description) class object. The video streamer should set parameters according to the parameters class. A particular video streamer might not support all parameters listed in the [VStreamerParams](#vstreamerparams-class-description) class. |
+| params    | [VStreamerParams](#vstreamerparams-class-description) class object. The video streamer should set parameters according to the parameters class. A particular video streamer might not support all parameters listed in the [VStreamerParams](#vstreamerparams-class-description) class. The implementation must check the values and return FALSE for values it doesn't support (for example, an unknown **securityProfile**). |
 | codec      | Pointer to [VCodec](https://rapidpixel.constantrobotics.com/docs/VideoCoding/VCodec.html) object. Used for encoding video in case of RAW input frame data. If the user sets the pointer to **nullptr**, the video streamer can process only compressed input video frames (H264, HEVC or JPEG). |
 | overlay    | Pointer to [VOverlay](https://rapidpixel.constantrobotics.com/docs/Service/VOverlay.html) object. Used to overlay information on video in case the user provides RAW input frame data to the streamer. If the user sets the pointer to **nullptr**, the video streamer will not be able to overlay any information on the video. |
 
@@ -236,13 +254,14 @@ virtual bool isVStreamerInit() = 0;
 The **sendFrame(...)** method is intended to send frames to clients. To provide a video stream, the user must call this method for every video frame coming from the video source. In case of processing RAW video frames, the streamer must resize the video (if necessary) and overlay information (if the pointer to the video overlay class is set in the [initVStreamer(...)](#initvstreamer-method) method). Method declaration:
 
 ```cpp
-virtual bool sendFrame(Frame& frame, uint8_t* userData = nullptr, int userDataSize = 0) = 0;
+virtual bool sendFrame(Frame& frame, uint8_t* userData = nullptr,
+                       int userDataSize = 0) = 0;
 ```
 
 | Parameter | Value                                                        |
 | --------- | ------------------------------------------------------------ |
 | frame     | [Frame](https://rapidpixel.constantrobotics.com/docs/Service/Frame.html) class object. Particular streamers can support RAW video frames or(and) compressed video frames. |
-| userData  | Pointer to user data (telemetry). Some streamers may support telemetry streaming (for example, [KLV](https://en.wikipedia.org/wiki/KLV) metadata) synchronized with video streams (for example, by timestamp). If the parameter is **nullptr**, the streamer will not send any telemetry data. |
+| userData  | Pointer to user data (telemetry). Some streamers may support telemetry streaming (for example, [KLV](https://en.wikipedia.org/wiki/KLV) metadata) synchronized with video streams (for example, by timestamp). If the parameter is **nullptr**, the streamer will not send any telemetry data. The buffer must be valid for **userDataSize** bytes. |
 | userDataSize  | Size of user data (telemetry), in bytes. If the parameter is **0**, the streamer will not send any telemetry data. |
 
 **Returns:** TRUE if the frame was sent (accepted by streamer) or FALSE if not.
@@ -271,7 +290,7 @@ virtual bool setParam(VStreamerParam id, std::string value) = 0;
 | Parameter | Description                                                  |
 | --------- | ------------------------------------------------------------ |
 | id        | Video stream parameter ID according to [VStreamerParam](#vstreamerparam-enum) enum. |
-| value     | Value of parameter. It can be either string or float type. It depends on parameter. |
+| value     | Value of parameter. It can be either string or float type. It depends on parameter. The value can come from a decoded command: the implementation must check it (for example, NaN, infinity or a value out of the range of the parameter) before use. |
 
 **Returns:** TRUE if the parameter is set or FALSE if not.
 
@@ -317,10 +336,10 @@ virtual bool decodeAndExecuteCommand(uint8_t* data, int size);
 
 | Parameter | Description                                                  |
 | --------- | ------------------------------------------------------------ |
-| data      | Pointer to input command.                                    |
+| data      | Pointer to input command. The buffer must be valid for **size** bytes. |
 | size      | Size of command.                                             |
 
-**Returns:** TRUE if command decoded (SET_PARAM or COMMAND) and executed (action command or set param command).
+**Returns:** TRUE if command decoded (SET_PARAM or COMMAND) by the [decodeCommand(...)](#decodecommand-method) method and executed (action command or set param command), or FALSE if the command is not decoded or not executed.
 
 
 
@@ -329,15 +348,17 @@ virtual bool decodeAndExecuteCommand(uint8_t* data, int size);
 The **encodeSetParamCommand(...)** static method encodes a command to change any parameter in a remote video streamer. To control a video streamer remotely, the developer has to design their own protocol and according to it encode the command and deliver it over the communication channel. To simplify this, the **VStreamer** class contains static methods for encoding the control command. The **VStreamer** class provides two types of commands: a parameter change command (SET_PARAM) and an action command (COMMAND). **encodeSetParamCommand(...)** is designed to encode the SET_PARAM command. The method has two overloads: one for numeric parameters and one for string parameters. Method declaration:
 
 ```cpp
-static void encodeSetParamCommand(uint8_t *data, int &size,  VStreamerParam id, float value);
+static void encodeSetParamCommand(uint8_t* data, int& size,
+                                  VStreamerParam id, float value);
 
-static void encodeSetParamCommand(uint8_t* data, int& size, VStreamerParam id, std::string value);
+static void encodeSetParamCommand(uint8_t* data, int& size,
+                                  VStreamerParam id, std::string value);
 ```
 
 | Parameter | Description                                                  |
 | --------- | ------------------------------------------------------------ |
 | data      | Pointer to data buffer for encoded command. For the float overload must have size >= 11. For the string overload must have size >= 8 + value.size() (3-byte header + 4-byte parameter ID + the string content + null terminator). |
-| size      | Size of encoded data. 11 bytes for the float overload; 8 + value.size() bytes for the string overload (minimum 8 bytes for an empty string). 0, and nothing is written, if **data** is null or the string is longer than INT_MAX - 8 bytes. |
+| size      | Size of encoded data. 11 bytes for the float overload; 8 + value.size() bytes for the string overload (minimum 8 bytes for an empty string). 0, and nothing is written, if **data** is null, the string contains a NUL character or the string is longer than INT_MAX - 8 bytes. |
 | id        | Parameter ID according to [VStreamerParam](#vstreamerparam-enum) enum. |
 | value     | Numeric video streamer parameter value. Only for non-string parameters. For string parameters (see [VStreamerParam](#vstreamerparam-enum) enum) this parameter may have any value. |
 | value     | String parameter value (see [VStreamerParam](#vstreamerparam-enum) enum). |
@@ -349,10 +370,15 @@ static void encodeSetParamCommand(uint8_t* data, int& size, VStreamerParam id, s
 uint8_t data[11];
 // Size of encoded data.
 int size = 0;
-// Random parameter value.
-float outValue = static_cast<float>(rand() % 20);
+// Parameter value.
+const float outValue = 10.0f;
 // Encode command.
-VStreamer::encodeSetParamCommand(data, size, VStreamerParam::CUSTOM1, outValue);
+cr::video::VStreamer::encodeSetParamCommand(
+        data, size, cr::video::VStreamerParam::CUSTOM1, outValue);
+if (size == 0)
+{
+    std::cout << "Command not encoded" << std::endl;
+}
 ```
 
 
@@ -368,18 +394,23 @@ static void encodeCommand(uint8_t* data, int& size, VStreamerCommand id);
 | Parameter | Description                                                  |
 | --------- | ------------------------------------------------------------ |
 | data      | Pointer to data buffer for output command. Must have size >= 7 bytes. |
-| size      | Size of encoded data. Will be 7 bytes.                       |
+| size      | Size of encoded data. Will be 7 bytes, or 0 (nothing is written) if **data** is null. |
 | id        | Command ID according to [VStreamerCommand](#vstreamercommand-enum) enum. |
 
 **encodeCommand(...)** is a static method and is used without a **VStreamer** class instance. This method is used on the client side (control system). Example of command encoding:
 
 ```cpp
 // Buffer for encoded data.
-uint8_t data[11];
+uint8_t data[7];
 // Size of encoded data.
 int size = 0;
 // Encode command.
-VStreamer::encodeCommand(data, size, VStreamerCommand::RESTART);
+cr::video::VStreamer::encodeCommand(
+        data, size, cr::video::VStreamerCommand::RESTART);
+if (size == 0)
+{
+    std::cout << "Command not encoded" << std::endl;
+}
 ```
 
 
@@ -399,16 +430,16 @@ static int decodeCommand(uint8_t* data,
 
 | Parameter | Description                                                  |
 | --------- | ------------------------------------------------------------ |
-| data      | Pointer to input command.                                    |
+| data      | Pointer to input command. The buffer must be valid for **size** bytes. |
 | size      | Size of command. Must be exactly 11 bytes for a float SET_PARAM command, exactly 8 + `strlen(strValue)` bytes (including the null terminator) for a string SET_PARAM command, and exactly 7 bytes for COMMAND. A longer or unterminated buffer is an error. |
-| paramId   | Parameter ID according to [VStreamerParam](#vstreamerparam-enum) enum. After decoding a SET_PARAM command the method will return the parameter ID. |
-| commandId | Command ID according to [VStreamerCommand](#vstreamercommand-enum) enum. After decoding a COMMAND the method will return the command ID. |
-| value    | Numeric video streamer parameter value. Only for non-string parameters. For string parameters (see [VStreamerParam](#vstreamerparam-enum) enum) this parameter may have any value. |
-| strValue    | String parameter value (see [VStreamerParam](#vstreamerparam-enum) enum). |
+| paramId   | Parameter ID according to [VStreamerParam](#vstreamerparam-enum) enum. After decoding a SET_PARAM command the method will return the parameter ID. Not changed if the method returns **0** or **-1**. |
+| commandId | Command ID according to [VStreamerCommand](#vstreamercommand-enum) enum. After decoding a COMMAND the method will return the command ID. Not changed if the method returns **1**, **2** or **-1**. |
+| value    | Numeric video streamer parameter value of a SET_PARAM command with float value. Set to **0** if the method returns **0** or **2**, not changed if the method returns **-1**. |
+| strValue    | String parameter value of a SET_PARAM command with string value (see [VStreamerParam](#vstreamerparam-enum) enum). Cleared if the method returns **0** or **1**, not changed if the method returns **-1**. |
 
 **Returns:** **0** - in case of decoding COMMAND, **1** - in case of decoding SET_PARAM command with float value, **2** - in case of decoding SET_PARAM command with string value, or **-1** in case of errors.
 
-The header byte selects the family: **0x00** COMMAND, **0x01** float SET_PARAM, **0x03** string SET_PARAM. **0x02** is the header a serialized **VStreamerParams** snapshot carries (see [Serialize video streamer parameters](#serialize-video-streamer-parameters)); a **0x02** datagram is therefore **not** a command and **decodeCommand** returns **-1** for it, rather than misreading the parameter mask as a command payload. A **null** `data` pointer, a COMMAND or float SET_PARAM whose `size` is not exact, and a string SET_PARAM that is missing its null terminator or that has bytes after it, also return **-1**.
+The header byte selects the family: **0x00** COMMAND, **0x01** float SET_PARAM, **0x03** string SET_PARAM. **0x02** is the header a serialized **VStreamerParams** snapshot carries (see [Serialize video streamer parameters](#serialize-video-streamer-parameters)); a **0x02** datagram is therefore **not** a command and **decodeCommand** returns **-1** for it, rather than misreading the parameter mask as a command payload. A **null** `data` pointer, a command of another major or minor version, a COMMAND or float SET_PARAM whose `size` is not exact, a string SET_PARAM that is missing its null terminator or that has bytes after it, and a command or parameter ID which is not a value of the [VStreamerCommand](#vstreamercommand-enum) or [VStreamerParam](#vstreamerparam-enum) enum, also return **-1**. The method doesn't check the parameter value: the video streamer implementation must check it in the **setParam(...)** method.
 
 
 
@@ -431,12 +462,13 @@ enum class VStreamerCommand
     ON,
     /// Disable. Equal to MODE param.
     OFF,
-    /// Generate key frame command.
+    /// Generate key frame command. The last value of the enum: it is used to
+    /// check IDs.
     GENERATE_KEYFRAME
 };
 ```
 
-**Table 4** - Video stream action commands description. Some commands may be unsupported by a particular video stream class.
+**Table 2** - Video stream action commands description. Some commands may be unsupported by a particular video stream class.
 
 | Command    | Description                                                  |
 | ------------ | ---------------------------------------------------------- |
@@ -502,7 +534,8 @@ enum class VStreamerParam
     USER,
     /// Streamer password (for RTSP streaming), string: "" - no password.
     PASSWORD,
-    /// Streamer suffix for RTSP streaming (stream name), string: "" - no suffix.
+    /// Streamer suffix for RTSP streaming (stream name), string: "" - no
+    /// suffix.
     SUFFIX,
     /// Metadata suffix (stream name), string: "" - no suffix.
     METADATA_SUFFIX,
@@ -526,7 +559,7 @@ enum class VStreamerParam
     CODEC,
     /// Scaling mode, integer: 0 - fit, 1 - fill.
     FIT_MODE,
-    /// Cycle time, integer μsec (microseconds). Calculated by video streamer.
+    /// Cycle time, integer microseconds. Calculated by video streamer.
     CYCLE_TIME_USEC,
     /// Overlay mode, integer: 0 - disable, 1 - enable.
     OVERLAY_MODE,
@@ -565,7 +598,7 @@ enum class VStreamerParam
     /// Logging mode. Values: 0 - Disable, 1 - Only file,
     /// 2 - Only terminal, 3 - File and terminal.
     LOG_LEVEL,
-    /// Direct stream transport/type, string. Accepted values are
+    /// Direct stream transport / type, string. Accepted values are
     /// implementation-defined (e.g. "rtp", "mpegts"); the value also decides
     /// whether KLV metadata is carried.
     DIRECT_STREAM_TYPE,
@@ -577,15 +610,16 @@ enum class VStreamerParam
     DIRECT_STREAM_PACING_MODE,
     /// Server-delivered stream type, string. Accepted values are
     /// implementation-defined (e.g. "rtp", "mpegts"); the value also decides
-    /// whether KLV metadata is carried. Distinct from RTSP_MODE (protocol on/off).
+    /// whether KLV metadata is carried. Distinct from RTSP_MODE (protocol
+    /// on / off).
     SERVER_STREAM_TYPE,
     /// Multicast TTL (scope) for every multicast leg, integer [0:255]:
     /// 0 - implementation default. An implementation may cap the value and
     /// must document the cap.
     MULTICAST_TTL,
-    /// Security/compliance profile, string. Accepted values are
-    /// IMPLEMENTATION-DEFINED; "" or "no" - the implementation's default. An
-    /// unrecognised value must be REJECTED, never silently defaulted.
+    /// Security / compliance profile, string. Accepted values are
+    /// implementation-defined; "" or "no" - the implementation's default. An
+    /// unrecognised value must be rejected, never silently defaulted.
     SECURITY_PROFILE,
     /// Public (routed) address to advertise to clients in SDP/ICE instead of
     /// the locally detected one, string: "" or "no" - detect automatically.
@@ -602,12 +636,13 @@ enum class VStreamerParam
     /// Single origin permitted to reach the HTTP-based signalling endpoints,
     /// string: "" or "no" - the implementation's default policy.
     CORS_ALLOWED_ORIGIN,
-    /// Maximum RTP payload size of the server-delivered stream, integer bytes.
+    /// Maximum RTP payload size of the server-delivered stream, integer
+    /// bytes. The last value of the enum: it is used to check IDs.
     SERVER_STREAM_MAX_PAYLOAD
 };
 ```
 
-**Table 5** - Video streamer parameters description. Some parameters may be unsupported by a particular video streamer class.
+**Table 3** - Video streamer parameters description. Some parameters may be unsupported by a particular video streamer class.
 
 | Parameter        | Description         |
 | ---------------- | ------------------- |
@@ -689,7 +724,7 @@ enum class VStreamerParam
 
 ## VStreamerParams class declaration
 
-The **VStreamerParams** class is used for video stream initialization (the [initVStreamer(...)](#initvstreamer-method) method) or to get all actual parameters (the [getParams(...)](#getparams-method) method). Also, **VStreamerParams** provides a structure to write/read parameters from JSON files, compatible with [ConfigReader](https://rapidpixel.constantrobotics.com/docs/Service/ConfigReader.html), and provides methods to serialize and deserialize parameters. Since 3.2.0 the JSON functions are written out by hand rather than generated by the **JSON_READABLE** macro: that macro is limited to 63 fields and this class carries 69. A key absent from the JSON leaves the corresponding field at its default rather than raising an error. Class declaration:
+The **VStreamerParams** class is used for video stream initialization (the [initVStreamer(...)](#initvstreamer-method) method) or to get all actual parameters (the [getParams(...)](#getparams-method) method). Also, **VStreamerParams** provides a structure to write/read parameters from JSON files, compatible with [ConfigReader](https://rapidpixel.constantrobotics.com/docs/Service/ConfigReader.html), and provides methods to serialize and deserialize parameters. The JSON functions of all 69 fields are generated by the **JSON_READABLE** macro of the **ConfigReader** library. The class doesn't check the values of the fields: the video streamer implementation must check them. The class is not thread-safe. Class declaration:
 
 ```cpp
 class VStreamerParams
@@ -701,7 +736,8 @@ public:
     int width{1280};
     /// Video stream height, integer [0:8192].
     int height{720};
-    /// Destination IP of the direct stream (point-to-point, bypasses MediaMTX), string.
+    /// Destination IP of the direct stream (point-to-point, bypasses
+    /// MediaMTX), string. Transport is set by directStreamType.
     std::string directStreamIp{"127.0.0.1"};
     /// RTSP port, integer [0:65535].
     int rtspPort{8554};
@@ -721,19 +757,25 @@ public:
     int rtmpsPort{1936};
     /// Metadata port, integer [0:65535].
     int metadataPort{9000};
-    /// RTSP protocol enable / disable, boolean: false - disable, true - enable.
+    /// RTSP protocol enable / disable, boolean: false - disable,
+    /// true - enable.
     bool rtspEnable{true};
-    /// Direct stream (point-to-point, bypasses MediaMTX) enable / disable, boolean: false - disable, true - enable.
+    /// Direct stream (point-to-point, bypasses MediaMTX) enable / disable,
+    /// boolean: false - disable, true - enable. Uses directStreamIp /
+    /// directStreamPort and the directStream* parameters.
     bool directStreamEnable{true};
-    /// WebRTC protocol enable / disable, boolean: false - disable, true - enable.
+    /// WebRTC protocol enable / disable, boolean: false - disable,
+    /// true - enable.
     bool webRtcEnable{true};
     /// HLS protocol enable / disable, boolean: false - disable, true - enable.
     bool hlsEnable{true};
     /// SRT protocol enable / disable, boolean: false - disable, true - enable.
     bool srtEnable{true};
-    /// RTMP protocol enable / disable, boolean: false - disable, true - enable.
+    /// RTMP protocol enable / disable, boolean: false - disable,
+    /// true - enable.
     bool rtmpEnable{true};
-    /// Metadata protocol enable / disable, boolean: false - disable, true - enable.
+    /// Metadata protocol enable / disable, boolean: false - disable,
+    /// true - enable.
     bool metadataEnable{false};
     /// RTSP multicast IP, string.
     std::string rtspMulticastIp{"224.1.0.1/16"};
@@ -741,9 +783,11 @@ public:
     int rtspMulticastPort{18000};
     /// Streamer user (for RTSP streaming), string: "" or "no" - no user.
     std::string user{"no"};
-    /// Streamer password (for RTSP streaming), string: "" or "no" - no password.
+    /// Streamer password (for RTSP streaming), string: "" or "no" - no
+    /// password.
     std::string password{"no"};
-    /// Streamer suffix for RTSP streaming (stream name), string: "" - no suffix.
+    /// Streamer suffix for RTSP streaming (stream name), string: "" - no
+    /// suffix.
     std::string suffix{"live"};
     /// Metadata suffix (stream name), string: "" - no suffix.
     std::string metadataSuffix{"metadata"};
@@ -767,7 +811,7 @@ public:
     std::string codec{"H264"};
     /// Scaling mode, integer: 0 - fit, 1 - fill.
     int fitMode{0};
-    /// Cycle time, integer μsec (microseconds). Calculated by video streamer.
+    /// Cycle time, integer microseconds. Calculated by video streamer.
     int cycleTimeUs{0};
     /// Overlay mode, boolean: false - off, true - on.
     bool overlayEnable{true};
@@ -781,19 +825,23 @@ public:
     float custom3{0.0f};
     /// Path to openssl key for RTSP, string: "" or "no" - no key.
     std::string rtspKey{"no"};
-    /// Path to openssl certificate for RTSP, string: "" or "no" - no certificate.
+    /// Path to openssl certificate for RTSP, string: "" or "no" - no
+    /// certificate.
     std::string rtspCert{"no"};
     /// Path to openssl key for WebRTC, string: "" or "no" - no key.
     std::string webRtcKey{"no"};
-    /// Path to openssl certificate for WebRTC, string: "" or "no" - no certificate.
+    /// Path to openssl certificate for WebRTC, string: "" or "no" - no
+    /// certificate.
     std::string webRtcCert{"no"};
     /// Path to openssl key for HLS, string: "" or "no" - no key.
     std::string hlsKey{"no"};
-    /// Path to openssl certificate for HLS, string: "" or "no" - no certificate.
+    /// Path to openssl certificate for HLS, string: "" or "no" - no
+    /// certificate.
     std::string hlsCert{"no"};
     /// Path to openssl key for RTMP, string: "" or "no" - no key.
     std::string rtmpKey{"no"};
-    /// Path to openssl certificate for RTMP, string: "" or "no" - no certificate.
+    /// Path to openssl certificate for RTMP, string: "" or "no" - no
+    /// certificate.
     std::string rtmpCert{"no"};
     /// RTSP encryption type, string: "" or "no", "strict", "optional".
     std::string rtspEncryption{"no"};
@@ -806,8 +854,8 @@ public:
     /// Logging mode. Values: 0 - Disable, 1 - Only file,
     /// 2 - Only terminal, 3 - File and terminal.
     int logLevel{0};
-    /// Transport/type of the direct (point-to-point) stream. String whose
-    /// accepted values are IMPLEMENTATION-DEFINED — each concrete VStreamer
+    /// Transport / type of the direct (point-to-point) stream. String whose
+    /// accepted values are implementation-defined: each concrete VStreamer
     /// decides the set and what each value means, including whether KLV
     /// metadata is carried (no separate flag). Examples: "rtp", "mpegts".
     std::string directStreamType{"rtp"};
@@ -815,39 +863,62 @@ public:
     int directStreamBitrateKbps{5000};
     /// Maximum UDP/RTP payload size for the direct stream, integer bytes.
     int directStreamMaxPayloadSize{1472};
-    /// Pacing mode of the direct stream, integer: 0 - target bitrate, 1 - push.
+    /// Pacing mode of the direct stream, integer: 0 - target bitrate,
+    /// 1 - push.
     int directStreamPacingMode{0};
-    /// Transport/type of the server-delivered stream (fed to the media server,
-    /// which fans it out to clients). String whose accepted values are
-    /// IMPLEMENTATION-DEFINED — each concrete VStreamer decides the set and what
-    /// each value means, including whether KLV metadata is carried (no separate
-    /// flag). Examples: "rtp", "mpegts". Distinct from rtspEnable (protocol on/off).
+    /// Transport / type of the server-delivered stream (fed to the media
+    /// server, which fans it out to clients). String whose accepted values
+    /// are implementation-defined: each concrete VStreamer decides the set
+    /// and what each value means, including whether KLV metadata is carried
+    /// (no separate flag). Examples: "rtp", "mpegts". Distinct from
+    /// rtspEnable (protocol on / off).
     std::string serverStreamType{"rtp"};
     /// Multicast TTL (scope) for every multicast leg, integer [0:255]:
-    /// 0 - implementation default.
+    /// 0 - implementation default. An implementation may cap the value and
+    /// must document the cap. Applies to every leg that sends to a multicast
+    /// group, not only the RTSP one.
     int multicastTtl{0};
-    /// Security/compliance profile. Accepted values are implementation-defined;
-    /// "" or "no" - the implementation's default. An unrecognised value must be
-    /// REJECTED, never mapped to a default.
+    /// Security / compliance profile. String whose accepted values are
+    /// implementation-defined, in the style of directStreamType: "" or "no" -
+    /// the implementation's own default. An unrecognised value must be
+    /// rejected by initVStreamer(...) / setParam(...), never mapped to a
+    /// default: a silent downgrade of the security posture is the failure
+    /// this field exists to prevent.
     std::string securityProfile{"no"};
-    /// Public (routed) address advertised in SDP/ICE instead of the detected
-    /// one, string: "" or "no" - detect automatically. A literal, not a name.
+    /// Public (routed) address advertised to clients in SDP and ICE candidate
+    /// lines instead of the locally detected one, string: "" or "no" - detect
+    /// automatically. An address literal, not a hostname: it is written onto
+    /// the wire verbatim. Needed behind 1:1 NAT, in containers, and on
+    /// multi-homed hosts, where the detected address is unroutable for the
+    /// viewer.
     std::string publicAddress{"no"};
-    /// Local address every listener binds to, string: "" or "0.0.0.0" - all.
+    /// Local address every listener binds to, string: "" or "0.0.0.0" - every
+    /// interface. A multi-homed host has no other way to keep a stream off an
+    /// interface it must not appear on.
     std::string bindAddress{"0.0.0.0"};
-    /// Lowest port of the RTP/RTCP range, integer: 0 - any ephemeral port.
+    /// Lowest port of the RTP/RTCP range, integer [0:65534]: 0 - any
+    /// ephemeral port. Should be even, because RTCP conventionally takes
+    /// port + 1.
     int rtpPortMin{0};
-    /// Highest port of the RTP/RTCP range, integer: 0 - any ephemeral port.
+    /// Highest port of the RTP/RTCP range, integer [0:65535]: 0 - any
+    /// ephemeral port. A firewall is configured for a range; without one an
+    /// implementation picks ephemeral ports nothing has been opened for.
     int rtpPortMax{0};
-    /// WebRTC media (UDP) port, integer: 0 - the implementation chooses.
+    /// WebRTC media (UDP) port, integer [0:65535]: 0 - the implementation
+    /// chooses. Distinct from webRtcPort, which carries signalling only.
     int webRtcMediaPort{0};
-    /// Single origin permitted to reach HTTP-based signalling, string:
-    /// "" or "no" - the implementation's default policy.
+    /// Single origin permitted to reach the HTTP-based signalling endpoints,
+    /// string "scheme://host[:port]": "" or "no" - the implementation's
+    /// default policy. Deliberately one origin and not a wildcard list.
     std::string corsAllowedOrigin{"no"};
-    /// Maximum RTP payload size of the server-delivered stream, integer bytes.
+    /// Maximum RTP payload size of the server-delivered stream, integer
+    /// bytes. The counterpart of directStreamMaxPayloadSize for the server
+    /// leg. An implementation may clamp it lower: a transform applied after
+    /// packetization (SRTP appends an authentication tag) can otherwise push
+    /// the datagram past the path MTU.
     int serverStreamMaxPayloadSize{1472};
 
-    /// JSON serialisation.
+    /// JSON serialization.
     JSON_READABLE(VStreamerParams, ...)
 
     /// Serialize parameters.
@@ -866,7 +937,7 @@ public:
 - **Metadata / KLV**: `metadataEnable`, `metadataPort`, `metadataSuffix`.
 - **Common / encoding**: `enable`, `width`, `height`, `codec`, `fps`, `gop`, `bitrateKbps`, `minBitrateKbps`, `maxBitrateKbps`, `bitrateMode`, `h264Profile`, `jpegQuality`, `fitMode`, `overlayEnable`, `type`, `logLevel`, `custom1..3`, SSL keys/certificates & encryption.
 
-**Table 6** - Video streamer parameters description. Some parameters may be unsupported by a particular video streamer class. The parameters correspond to the [VStreamerParam](#vstreamerparam-enum) enum.
+**Table 4** - Video streamer parameters description. Some parameters may be unsupported by a particular video streamer class. The parameters correspond to the [VStreamerParam](#vstreamerparam-enum) enum.
 
 | Parameter        | Description         |
 | ---------------- | ------------------- |
@@ -944,92 +1015,164 @@ public:
 
 ## Serialize video streamer parameters
 
-The **VStreamerParams** class provides a method **serialize(...)** to serialize video streamer parameters (fields of the [VStreamerParams](#vstreamerparams-class-description) class). Serialization of video streamer parameters is necessary when you need to send video streamer parameters via communication channels. The method provides options to exclude particular parameters from serialization. To do this, the method inserts a binary mask (10 bytes) where each bit represents a particular parameter and the **deserialize(...)** method recognizes it. Integers and floats are stored in the **byte order of the host** that serializes them: the data is meant for hosts of the same byte order, and a consumer of the other order reads wrong values. A string must not contain a NUL byte: **deserialize(...)** reads it up to the first one and the fields after it are read shifted. The mask follows a 3-byte header (marker plus major and minor version), so the parameter payload starts at offset 13. The mask grew from 8 bytes to 10 in 3.2.0, which is why a 3.1 peer cannot read a 3.2 message -- **deserialize(...)** rejects it on the version check rather than misreading the offsets. Method declaration:
+The **VStreamerParams** class provides a method **serialize(...)** to serialize video streamer parameters (fields of the [VStreamerParams](#vstreamerparams-class-description) class). Serialization of video streamer parameters is necessary when you need to send video streamer parameters via communication channels. The method provides options to exclude particular parameters from serialization. To do this, the method inserts a binary mask (10 bytes) where each bit represents a particular parameter and the **deserialize(...)** method recognizes it. The mask follows a 3-byte header (data type **0x02** plus major and minor version of the library), so the parameter payload starts at offset 13. The parameters follow in the order of the mask bits: bool as 1 byte (**0** or **1**), integers and floats as 4 bytes, strings as their characters and a terminating NUL byte. Integers and floats are stored in the **byte order of the host** that serializes them: the data is meant for hosts of the same byte order, and a consumer of the other order reads wrong values. A string which contains a NUL character is not serialized (its mask bit is not set): **deserialize(...)** would end the string at that character and read the rest of it as the next parameters. **deserialize(...)** accepts only data of its own major and minor version. Method declaration:
 
 ```cpp
-bool serialize(uint8_t* data, int bufferSize, int& size, VStreamerParamsMask* mask = nullptr);
+bool serialize(uint8_t* data, int bufferSize, int& size,
+               VStreamerParamsMask* mask = nullptr);
 ```
 
 | Parameter  | Value                                                        |
 | ---------- | ------------------------------------------------------------ |
-| data       | Pointer to data buffer.                                      |
-| bufferSize | Data buffer size, **minimum 14 bytes** (13-byte header plus one field). Below that the method returns FALSE and sets **size** to 0. Above it, a buffer too small for every selected parameter is filled with as many as fit, and the ones that did not fit are simply absent from the mask. |
-| size       | Size of serialized data.                                     |
-| mask       | Parameters mask - pointer to **VStreamerParamsMask** structure. **VStreamerParamsMask** (declared in VStreamer.h file) determines flags for each field (parameter) declared in **VStreamerParams** class. If the user wants to exclude any parameters from serialization, he can put a pointer to the mask. If the user wants to exclude a particular parameter from serialization, he should set the corresponding flag in the VStreamerParams structure. |
+| data       | Pointer to data buffer. Must not be null. The buffer must be valid for **bufferSize** bytes. |
+| bufferSize | Data buffer size, **minimum 14 bytes** (13-byte header plus one field). Below that the method returns FALSE, sets **size** to 0 and doesn't change the buffer. Above it, a buffer too small for every selected parameter is filled with as many as fit, and the ones that did not fit are simply absent from the mask. |
+| size       | Size of serialized data. 0 if the method returns FALSE.      |
+| mask       | Parameters mask - pointer to **VStreamerParamsMask** structure. **VStreamerParamsMask** (declared in VStreamer.h file) determines flags for each field (parameter) declared in **VStreamerParams** class. If the mask is **nullptr** all parameters are serialized. To exclude a particular parameter from serialization, set the corresponding flag of the mask to **false**. |
+
+**Returns:** TRUE if parameters are serialized or FALSE if **data** is null or **bufferSize** is less than 14 bytes.
 
 **VStreamerParamsMask** structure declaration:
 
 ```cpp
 struct VStreamerParamsMask
 {
+    /// Serialize enable field.
     bool enable{true};
+    /// Serialize width field.
     bool width{true};
+    /// Serialize height field.
     bool height{true};
+    /// Serialize directStreamIp field.
     bool directStreamIp{true};
+    /// Serialize rtspPort field.
     bool rtspPort{true};
+    /// Serialize rtspsPort field.
     bool rtspsPort{true};
+    /// Serialize directStreamPort field.
     bool directStreamPort{true};
+    /// Serialize webRtcPort field.
     bool webRtcPort{true};
+    /// Serialize hlsPort field.
     bool hlsPort{true};
+    /// Serialize srtPort field.
     bool srtPort{true};
+    /// Serialize rtmpPort field.
     bool rtmpPort{true};
+    /// Serialize rtmpsPort field.
     bool rtmpsPort{true};
+    /// Serialize metadataPort field.
     bool metadataPort{true};
+    /// Serialize rtspEnable field.
     bool rtspEnable{true};
+    /// Serialize directStreamEnable field.
     bool directStreamEnable{true};
+    /// Serialize webRtcEnable field.
     bool webRtcEnable{true};
+    /// Serialize hlsEnable field.
     bool hlsEnable{true};
+    /// Serialize srtEnable field.
     bool srtEnable{true};
+    /// Serialize rtmpEnable field.
     bool rtmpEnable{true};
+    /// Serialize metadataEnable field.
     bool metadataEnable{true};
+    /// Serialize rtspMulticastIp field.
     bool rtspMulticastIp{true};
+    /// Serialize rtspMulticastPort field.
     bool rtspMulticastPort{true};
+    /// Serialize user field.
     bool user{true};
+    /// Serialize password field.
     bool password{true};
+    /// Serialize suffix field.
     bool suffix{true};
+    /// Serialize metadataSuffix field.
     bool metadataSuffix{true};
+    /// Serialize minBitrateKbps field.
     bool minBitrateKbps{true};
+    /// Serialize maxBitrateKbps field.
     bool maxBitrateKbps{true};
+    /// Serialize bitrateKbps field.
     bool bitrateKbps{true};
+    /// Serialize bitrateMode field.
     bool bitrateMode{true};
+    /// Serialize fps field.
     bool fps{true};
+    /// Serialize gop field.
     bool gop{true};
+    /// Serialize h264Profile field.
     bool h264Profile{true};
+    /// Serialize jpegQuality field.
     bool jpegQuality{true};
+    /// Serialize codec field.
     bool codec{true};
+    /// Serialize fitMode field.
     bool fitMode{true};
+    /// Serialize cycleTimeUs field.
     bool cycleTimeUs{true};
+    /// Serialize overlayEnable field.
     bool overlayEnable{true};
+    /// Serialize type field.
     bool type{true};
+    /// Serialize custom1 field.
     bool custom1{true};
+    /// Serialize custom2 field.
     bool custom2{true};
+    /// Serialize custom3 field.
     bool custom3{true};
+    /// Serialize rtspKey field.
     bool rtspKey{true};
+    /// Serialize rtspCert field.
     bool rtspCert{true};
+    /// Serialize webRtcKey field.
     bool webRtcKey{true};
+    /// Serialize webRtcCert field.
     bool webRtcCert{true};
+    /// Serialize hlsKey field.
     bool hlsKey{true};
+    /// Serialize hlsCert field.
     bool hlsCert{true};
+    /// Serialize rtmpKey field.
     bool rtmpKey{true};
+    /// Serialize rtmpCert field.
     bool rtmpCert{true};
+    /// Serialize rtspEncryption field.
     bool rtspEncryption{true};
+    /// Serialize webRtcEncryption field.
     bool webRtcEncryption{true};
+    /// Serialize rtmpEncryption field.
     bool rtmpEncryption{true};
+    /// Serialize hlsEncryption field.
     bool hlsEncryption{true};
+    /// Serialize logLevel field.
     bool logLevel{true};
+    /// Serialize directStreamType field.
     bool directStreamType{true};
+    /// Serialize directStreamBitrateKbps field.
     bool directStreamBitrateKbps{true};
+    /// Serialize directStreamMaxPayloadSize field.
     bool directStreamMaxPayloadSize{true};
+    /// Serialize directStreamPacingMode field.
     bool directStreamPacingMode{true};
+    /// Serialize serverStreamType field.
     bool serverStreamType{true};
+    /// Serialize multicastTtl field.
     bool multicastTtl{true};
+    /// Serialize securityProfile field.
     bool securityProfile{true};
+    /// Serialize publicAddress field.
     bool publicAddress{true};
+    /// Serialize bindAddress field.
     bool bindAddress{true};
+    /// Serialize rtpPortMin field.
     bool rtpPortMin{true};
+    /// Serialize rtpPortMax field.
     bool rtpPortMax{true};
+    /// Serialize webRtcMediaPort field.
     bool webRtcMediaPort{true};
+    /// Serialize corsAllowedOrigin field.
     bool corsAllowedOrigin{true};
+    /// Serialize serverStreamMaxPayloadSize field.
     bool serverStreamMaxPayloadSize{true};
 };
 ```
@@ -1037,35 +1180,41 @@ struct VStreamerParamsMask
 Example without parameters mask:
 
 ```cpp
-// Prepare random params.
-VStreamerParams in;
+// Prepare params.
+cr::video::VStreamerParams in;
 in.directStreamIp = "alsfghljb";
 in.directStreamPort = 0;
 
 // Serialize parameters.
 uint8_t data[1024];
 int size = 0;
-in.serialize(data, 1024, size);
-cout << "Serialized data size: " << size << " bytes" << endl;
+if (!in.serialize(data, sizeof(data), size))
+{
+    std::cout << "Parameters not serialized" << std::endl;
+}
+std::cout << "Serialized data size: " << size << " bytes" << std::endl;
 ```
 
 Example with parameters mask:
 
 ```cpp
-// Prepare random parameters.
-VStreamerParams in;
+// Prepare parameters.
+cr::video::VStreamerParams in;
 in.directStreamIp = "alsfghljb";
 in.directStreamPort = 0;
 
 // Prepare parameters mask.
-VStreamerParamsMask mask;
+cr::video::VStreamerParamsMask mask;
 mask.directStreamPort = false; // Exclude directStreamPort. Others by default.
 
-// Encode parameters.
+// Serialize parameters.
 uint8_t data[1024];
 int size = 0;
-in.serialize(data, 1024, size, &mask);
-cout << "Serialized data size: " << size << " bytes" << endl;
+if (!in.serialize(data, sizeof(data), size, &mask))
+{
+    std::cout << "Parameters not serialized" << std::endl;
+}
+std::cout << "Serialized data size: " << size << " bytes" << std::endl;
 ```
 
 
@@ -1080,18 +1229,21 @@ bool deserialize(uint8_t* data, int dataSize);
 
 | Parameter | Value         |
 | --------- | ------------- |
-| data      | Pointer to serialized data buffer. |
-| dataSize  | Size of data. |
+| data      | Pointer to serialized data buffer. Must not be null. The buffer must be valid for **dataSize** bytes. |
+| dataSize  | Size of data, minimum 13 bytes (header). |
 
 **deserialize(...)** replaces the WHOLE object: every parameter whose mask bit
 is clear is reset to a zero value (**0**, **false** or an empty string) in the
 destination, not left at whatever it held before. It is not a partial update,
 so deserialize into a fresh **VStreamerParams** unless you intend the excluded
-fields to be cleared. The method also refuses a buffer shorter than 14 bytes, a
-foreign header byte, and any message whose major **or minor** version differs
-from the library's own. A message is applied as a whole or not at all: when
-the method returns FALSE (a truncated field, a string without its terminator)
-the object is exactly as it was before the call.
+fields to be cleared. The method also refuses a buffer shorter than 13 bytes, a
+foreign header byte, any message whose major **or minor** version differs
+from the library's own, and a mask with bits of unknown parameters. Bytes after
+the last parameter are ignored. A message is applied as a whole or not at all:
+when the method returns FALSE (a truncated field, a string without its
+terminator) the object is exactly as it was before the call. The values of
+the parameters are not checked: the video streamer implementation must check
+them before use.
 
 **Returns:** TRUE if data is deserialized or FALSE if not.
 
@@ -1099,106 +1251,123 @@ Example:
 
 ```cpp
 // Serialize parameters.
-VStreamerParams in;
+cr::video::VStreamerParams in;
 uint8_t data[1024];
 int size = 0;
-in.serialize(data, 1024, size);
-
-cout << "Serialized data size: " << size << " bytes" << endl;
+if (!in.serialize(data, sizeof(data), size))
+{
+    std::cout << "Parameters not serialized" << std::endl;
+}
+std::cout << "Serialized data size: " << size << " bytes" << std::endl;
 
 // Deserialize parameters.
-VStreamerParams out;
+cr::video::VStreamerParams out;
 if (!out.deserialize(data, size))
-    cout << "Can't decode data" << endl;
+{
+    std::cout << "Can't deserialize data" << std::endl;
+}
 ```
 
 
 
 ## Read parameters from JSON file and write to JSON file
 
-The **VStreamer** library depends on the **ConfigReader** library which provides methods to read parameters from JSON files and to write parameters to JSON files. Example of writing and reading parameters to JSON file:
+The **VStreamer** library depends on the **ConfigReader** library which provides methods to read parameters from JSON files and to write parameters to JSON files. The **get(...)** method of **ConfigReader** returns FALSE if a parameter is absent in the JSON or has a wrong type (for example, a string instead of a number, or a number out of the range of the parameter type), and doesn't change the **VStreamerParams** object in this case. A number with a fractional part is truncated for an integer parameter. The values are not checked against the ranges of the parameters. Example of writing and reading parameters to JSON file:
 
 ```cpp
 // Write params to file.
-VStreamerParams in;
+cr::video::VStreamerParams in;
 cr::utils::ConfigReader inConfig;
-inConfig.set(in, "vStreamerParams");
-inConfig.writeToFile("TestVStreamerParams.json");
+if (!inConfig.set(in, "vStreamerParams") ||
+    !inConfig.writeToFile("TestVStreamerParams.json"))
+{
+    std::cout << "Can't write config file" << std::endl;
+}
 
 // Read params from file.
 cr::utils::ConfigReader outConfig;
-if(!outConfig.readFromFile("TestVStreamerParams.json"))
+cr::video::VStreamerParams out;
+if (!outConfig.readFromFile("TestVStreamerParams.json") ||
+    !outConfig.get(out, "vStreamerParams"))
 {
-    cout << "Can't open config file" << endl;
-    return false;
+    std::cout << "Can't read params from config file" << std::endl;
 }
 ```
 
-**TestVStreamerParams.json** will look like (random values):
+**TestVStreamerParams.json** will look like (default values):
 
 ```json
 {
-    "vStreamerParams": 
-    {
-        "bitrateKbps": 45157,
-        "bitrateMode": 53395,
-        "codec": "dkgvmkrnjv",
-        "custom1": 16353.0,
-        "custom2": 30513.0,
-        "custom3": 16213.0,
-        "directStreamBitrateKbps": 5000,
+    "vStreamerParams": {
+        "enable": true,
+        "width": 1280,
+        "height": 720,
+        "directStreamIp": "127.0.0.1",
+        "rtspPort": 8554,
+        "rtspsPort": 8555,
+        "directStreamPort": 5004,
+        "webRtcPort": 7000,
+        "hlsPort": 8080,
+        "srtPort": 6000,
+        "rtmpPort": 1935,
+        "rtmpsPort": 1936,
+        "metadataPort": 9000,
+        "rtspEnable": true,
         "directStreamEnable": true,
-        "directStreamIp": "sfspfo9jbjnbjhklvllks",
+        "webRtcEnable": true,
+        "hlsEnable": true,
+        "srtEnable": true,
+        "rtmpEnable": true,
+        "metadataEnable": false,
+        "rtspMulticastIp": "224.1.0.1/16",
+        "rtspMulticastPort": 18000,
+        "user": "no",
+        "password": "no",
+        "suffix": "live",
+        "metadataSuffix": "metadata",
+        "minBitrateKbps": 1000,
+        "maxBitrateKbps": 5000,
+        "bitrateKbps": 3000,
+        "bitrateMode": 0,
+        "fps": 30.0,
+        "gop": 30,
+        "h264Profile": 0,
+        "jpegQuality": 80,
+        "codec": "H264",
+        "fitMode": 0,
+        "cycleTimeUs": 0,
+        "overlayEnable": true,
+        "type": 0,
+        "custom1": 0.0,
+        "custom2": 0.0,
+        "custom3": 0.0,
+        "rtspKey": "no",
+        "rtspCert": "no",
+        "webRtcKey": "no",
+        "webRtcCert": "no",
+        "hlsKey": "no",
+        "hlsCert": "no",
+        "rtmpKey": "no",
+        "rtmpCert": "no",
+        "rtspEncryption": "no",
+        "webRtcEncryption": "no",
+        "rtmpEncryption": "no",
+        "hlsEncryption": "no",
+        "logLevel": 0,
+        "directStreamType": "rtp",
+        "directStreamBitrateKbps": 5000,
         "directStreamMaxPayloadSize": 1472,
         "directStreamPacingMode": 0,
-        "directStreamPort": 31062,
-        "directStreamType": "mpegts",
-        "enable": false,
-        "fitMode": 14594,
-        "fps": 12255.0,
-        "gop": 32446,
-        "h264Profile": 17051,
-        "height": 44304,
-        "hlsCert": "24kjcnnv",
-        "hlsEnable": false,
-        "hlsEncryption": "wieufjpowkf",
-        "hlsKey": "wqlovf;qb",
-        "hlsPort": 9365,
-        "jpegQuality": 22605,
-        "logLevel": 0,
-        "maxBitrateKbps": 11267,
-        "metadataEnable": false,
-        "metadataPort": 35074,
-        "metadataSuffix": "z.,nfpowe",
-        "minBitrateKbps": 6818,
-        "overlayEnable": true,
-        "password": "sddgoihw,",
-        "rtmpCert": "wfpomv",
-        "rtmpEnable": true,
-        "rtmpEncryption": "skldfjdf",
-        "rtmpKey": "dkkkkjfkjdkjfkj2134",
-        "rtmpPort": 55981,
-        "rtmpsPort": 1936,
-        "rtspCert": "lkjrkjg",
-        "rtspEnable": true,
-        "rtspEncryption": "quyen",
-        "rtspKey": "dh;skcsf",
-        "rtspMulticastIp": "wpofuihifo",
-        "rtspMulticastPort": 47135,
-        "rtspPort": 42745,
-        "rtspsPort": 56847,
         "serverStreamType": "rtp",
-        "srtEnable": true,
-        "srtPort": 1963,
-        "suffix": "pisfhcowmfv",
-        "type": 5617,
-        "user": "slfljkv",
-        "webRtcCert": "erghshiAJ",
-        "webRtcEnable": false,
-        "webRtcEncryption": "l;uoykh",
-        "webRtcKey": "WERUHUHFE",
-        "webRtcPort": 50955,
-        "width": 48849
+        "multicastTtl": 0,
+        "securityProfile": "no",
+        "publicAddress": "no",
+        "bindAddress": "0.0.0.0",
+        "rtpPortMin": 0,
+        "rtpPortMax": 0,
+        "webRtcMediaPort": 0,
+        "corsAllowedOrigin": "no",
+        "serverStreamMaxPayloadSize": 1472
     }
 }
 ```
@@ -1207,40 +1376,83 @@ if(!outConfig.readFromFile("TestVStreamerParams.json"))
 
 # Build and connect to your project
 
-Typical commands to build **VStreamer** library:
+
+
+## Build stand alone
+
+The repository doesn't contain sub-repositories. The libraries **VStreamer** depends on (**Frame**, **ConfigReader**, **VOverlay** and **VCodec**) must be cloned into the same folder as **VStreamer**. The folder structure must be:
 
 ```bash
+<work folder>
+    VStreamer
+    Frame
+    ConfigReader
+    VOverlay
+    VCodec
+```
+
+Typical commands to build the library, the test application and the example (use the URLs of the repositories provided to you):
+
+```bash
+git clone <VStreamer repository URL>
+git clone <Frame repository URL>
+git clone <ConfigReader repository URL>
+git clone <VOverlay repository URL>
+git clone <VCodec repository URL>
 cd VStreamer
-git submodule update --init --recursive
 mkdir build
 cd build
 cmake ..
 make
 ```
 
-If you want connect **VStreamer** library to your CMake project as source code you can make follow. For example, if your repository has structure:
+On Windows use `cmake --build . --config Release` instead of `make`. If **VStreamer** is the top-level CMake project, the main CMakeLists.txt file adds the folders ../Frame, ../ConfigReader, ../VOverlay and ../VCodec (in this order) before the library itself. If a folder doesn't exist CMake stops with an error.
+
+
+
+## CMake options
+
+**Table 5** - CMake options of the repository. In the options below ${PARENT} is the prefix defined by the top-level project (empty if **VStreamer** is the top-level project).
+
+| Option                              | Default                                           | Description                                                  |
+| ----------------------------------- | ------------------------------------------------- | ------------------------------------------------------------ |
+| ${PARENT}_VSTREAMER                 | ON                                                | Build the library.                                           |
+| ${PARENT}_VSTREAMER_TEST            | ON (stand alone), OFF (included in other project) | Build the test application.                                  |
+| ${PARENT}_VSTREAMER_EXAMPLE         | ON (stand alone), OFF (included in other project) | Build the example of custom video streamer.                  |
+| ${PARENT}_SUBMODULE_CACHE_OVERWRITE | ON                                                | Forced rewriting of the options above in the CMake cache. The top-level project sets it to OFF when it includes **VStreamer** as a sub-repository. |
+| CMAKE_BUILD_TYPE                    | Release (if not specified)                        | Build type.                                                  |
+
+
+
+## Connect to your project
+
+If you want to connect **VStreamer** library to your CMake project as source code you can make follow. For example, if your repository has structure:
 
 ```bash
 CMakeLists.txt
 src
-    CMakeList.txt
+    CMakeLists.txt
     yourLib.h
     yourLib.cpp
 ```
 
-Create folder **3rdparty** and copy **VStreamer** repository folder there. New structure of your repository:
+Create folder **3rdparty** in your repository and clone (or copy) the repositories of **Frame**, **ConfigReader**, **VOverlay**, **VCodec** and **VStreamer** there. Structure of your repository with the libraries:
 
 ```bash
 CMakeLists.txt
 src
-    CMakeList.txt
+    CMakeLists.txt
     yourLib.h
     yourLib.cpp
 3rdparty
+    Frame
+    ConfigReader
+    VOverlay
+    VCodec
     VStreamer
 ```
 
-Create CMakeLists.txt file in **3rdparty** folder. CMakeLists.txt should contain:
+When **VStreamer** is included in another project it doesn't add the libraries it depends on: your project must add **Frame**, **ConfigReader**, **VOverlay** and **VCodec** by itself. If they are not added the compiler stops with the error `ConfigReader.h: No such file or directory`. Create CMakeLists.txt file in **3rdparty** folder. CMakeLists.txt should contain:
 
 ```cmake
 cmake_minimum_required(VERSION 3.13)
@@ -1261,22 +1473,78 @@ SET(PARENT ${PARENT}_YOUR_PROJECT_3RDPARTY)
 SET(${PARENT}_SUBMODULE_CACHE_OVERWRITE OFF CACHE BOOL "" FORCE)
 
 ################################################################################
+## CONFIGURATION
+## 3rd-party submodules configuration
+################################################################################
+SET(${PARENT}_SUBMODULE_FRAME                           ON  CACHE BOOL "" FORCE)
+if (${PARENT}_SUBMODULE_FRAME)
+    SET(${PARENT}_FRAME                                 ON  CACHE BOOL "" FORCE)
+    SET(${PARENT}_FRAME_TEST                            OFF CACHE BOOL "" FORCE)
+endif()
+
+SET(${PARENT}_SUBMODULE_CONFIG_READER                   ON  CACHE BOOL "" FORCE)
+if (${PARENT}_SUBMODULE_CONFIG_READER)
+    SET(${PARENT}_CONFIG_READER                         ON  CACHE BOOL "" FORCE)
+    SET(${PARENT}_CONFIG_READER_EXAMPLES                OFF CACHE BOOL "" FORCE)
+    SET(${PARENT}_CONFIG_READER_TESTS                   OFF CACHE BOOL "" FORCE)
+endif()
+
+SET(${PARENT}_SUBMODULE_VOVERLAY                        ON  CACHE BOOL "" FORCE)
+if (${PARENT}_SUBMODULE_VOVERLAY)
+    SET(${PARENT}_VOVERLAY                              ON  CACHE BOOL "" FORCE)
+endif()
+
+SET(${PARENT}_SUBMODULE_VCODEC                          ON  CACHE BOOL "" FORCE)
+if (${PARENT}_SUBMODULE_VCODEC)
+    SET(${PARENT}_VCODEC                                ON  CACHE BOOL "" FORCE)
+endif()
+
+SET(${PARENT}_SUBMODULE_VSTREAMER                       ON  CACHE BOOL "" FORCE)
+if (${PARENT}_SUBMODULE_VSTREAMER)
+    SET(${PARENT}_VSTREAMER                             ON  CACHE BOOL "" FORCE)
+    SET(${PARENT}_VSTREAMER_TEST                        OFF CACHE BOOL "" FORCE)
+    SET(${PARENT}_VSTREAMER_EXAMPLE                     OFF CACHE BOOL "" FORCE)
+endif()
+
+################################################################################
 ## INCLUDING SUBDIRECTORIES
 ## Adding subdirectories according to the 3rd-party configuration
 ################################################################################
-add_subdirectory(VStreamer)
+if (${PARENT}_SUBMODULE_FRAME)
+    add_subdirectory(Frame)
+endif()
+
+if (${PARENT}_SUBMODULE_CONFIG_READER)
+    add_subdirectory(ConfigReader)
+endif()
+
+if (${PARENT}_SUBMODULE_VOVERLAY)
+    add_subdirectory(VOverlay)
+endif()
+
+if (${PARENT}_SUBMODULE_VCODEC)
+    add_subdirectory(VCodec)
+endif()
+
+if (${PARENT}_SUBMODULE_VSTREAMER)
+    add_subdirectory(VStreamer)
+endif()
 ```
 
-File **3rdparty/CMakeLists.txt** adds folder **VStreamer** to your project and excludes test application and example (VStreamer class test applications and example of custom video streamer class implementation) from compiling (by default test application and example excluded from compiling if **VStreamer** included as sub-repository). Your repository new structure will be:
+File **3rdparty/CMakeLists.txt** adds folders **Frame**, **ConfigReader**, **VOverlay**, **VCodec** and **VStreamer** (in this order: **VStreamer** is added after the libraries it depends on) to your project and excludes test applications and examples from compiling (by default test application and example excluded from compiling if **VStreamer** included as sub-repository). Structure of your repository will be:
 
 ```bash
 CMakeLists.txt
 src
-    CMakeList.txt
+    CMakeLists.txt
     yourLib.h
     yourLib.cpp
 3rdparty
     CMakeLists.txt
+    Frame
+    ConfigReader
+    VOverlay
+    VCodec
     VStreamer
 ```
 
@@ -1296,9 +1564,17 @@ Done!
 
 
 
+# Portability
+
+Serialized parameters (**VStreamerParams::serialize(...)** method) and encoded commands (**VStreamer::encodeCommand(...)** and **VStreamer::encodeSetParamCommand(...)** methods) store int and float values as raw 4 bytes in the byte order of the host and bool values as 1 byte. The library checks at compile time that int and float have 4 bytes and bool has 1 byte. Data must be exchanged between hosts with the same byte order. The library was built and tested only on little-endian CPUs (x86-64 and AArch64).
+
+The library doesn't use SIMD instructions or CPU specific code. The library, the example and the test application were built without warnings with GCC 11 and GCC 12 (x86-64) and with the GCC 11 cross compiler for AArch64, and the test application was run on x86-64 and under emulation for AArch64.
+
+
+
 # How to make custom implementation
 
-The **VStreamer** class provides only an interface, data structures, and methods for encoding and decoding commands and params. To create your own implementation of the video streamer, you must include the VStreamer repository in your project (see [Build and connect to your project](#build-and-connect-to-your-project) section). The catalogue **example** (see [Library files](#library-files) section) includes an example of the design of the custom video streamer. You must implement all the methods of the VStreamer interface class. Custom video streamer class declaration:
+The **VStreamer** class provides only an interface, data structures, and methods for encoding and decoding commands and params. To create your own implementation of the video streamer, you must include the VStreamer repository in your project (see [Build and connect to your project](#build-and-connect-to-your-project) section). The catalogue **example** (see [Library files](#library-files) section) includes an example of the design of the custom video streamer. You must implement all the methods of the VStreamer interface class. The methods **setParam(...)**, **getParams(...)** and **executeCommand(...)** must be thread-safe, and every value which comes from outside (**initVStreamer(...)**, **setParam(...)**, decoded commands) must be checked before it is used. The example keeps the parameters under a mutex, rejects a value which is not valid (NaN, infinity, a value out of the range of the parameter, an unknown string value, text with control characters) and doesn't change the parameter in this case. Custom video streamer class declaration:
 
 ```cpp
 namespace cr
@@ -1306,41 +1582,60 @@ namespace cr
 namespace video
 {
 /// Custom video streamer class.
-class CustomVStreamer: public VStreamer
+class CustomVStreamer : public VStreamer
 {
 public:
 
+    /// Class constructor.
+    CustomVStreamer();
+
     /// Class destructor.
-    ~CustomVStreamer();
+    ~CustomVStreamer() override;
+
+    /// Copy and move are deleted: the object owns a mutex.
+    CustomVStreamer(const CustomVStreamer&) = delete;
+    CustomVStreamer(CustomVStreamer&&) = delete;
+    CustomVStreamer& operator=(const CustomVStreamer&) = delete;
+    CustomVStreamer& operator=(CustomVStreamer&&) = delete;
 
     /// Get string of current library version.
     static std::string getVersion();
 
-    /// Init video streamer. All params will be set according to structure.
-    bool initVStreamer(VStreamerParams &params,
-                       VCodec *codec = nullptr,
-                       VOverlay *overlay = nullptr) override;
+    /// Initialize video streamer. All parameters are checked first.
+    bool initVStreamer(VStreamerParams& params,
+                       VCodec* codec = nullptr,
+                       VOverlay* overlay = nullptr) override;
 
-    /// Get open status.
+    /// Get initialization status.
     bool isVStreamerInit() override;
 
     /// Close video streamer.
     void closeVStreamer() override;
 
     /// Send frame to video streamer.
-    bool sendFrame(Frame& frame, uint8_t* userData = nullptr, int userDataSize = 0) override;
+    bool sendFrame(Frame& frame, uint8_t* userData = nullptr,
+                   int userDataSize = 0) override;
 
-    /// Set video streamer param.
+    /// Set video streamer parameter with a numeric value.
     bool setParam(VStreamerParam id, float value) override;
 
-    /// Set video streamer param.
+    /// Set video streamer parameter with a string value.
     bool setParam(VStreamerParam id, std::string value) override;
 
-    /// Get video streamer params structure.
+    /// Get video streamer parameters structure.
     void getParams(VStreamerParams& params) override;
 
     /// Execute command.
     bool executeCommand(VStreamerCommand id) override;
+
+private:
+
+    /// Video streamer parameters. Protected by m_mutex.
+    VStreamerParams m_params;
+    /// Initialization status. Protected by m_mutex.
+    bool m_isInit{false};
+    /// Mutex to protect m_params and m_isInit.
+    std::mutex m_mutex;
 };
 }
 }

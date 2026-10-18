@@ -52,7 +52,17 @@ endif()
 ## Adding subdirectories according to the project configuration
 ################################################################################
 if (${PARENT}_VSTREAMER)
-    add_subdirectory(3rdparty)
+    # If this project is a stand alone repository, its dependencies are expected
+    # to be next to it (../Frame, ../ConfigReader, ../VOverlay, ../VCodec) and
+    # are added first, in order of their mutual dependencies. If this project is
+    # included in another one, the top-level CMakeLists.txt must add these
+    # libraries by itself.
+    if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
+        add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../Frame ${CMAKE_CURRENT_BINARY_DIR}/Frame)
+        add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../ConfigReader ${CMAKE_CURRENT_BINARY_DIR}/ConfigReader)
+        add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../VOverlay ${CMAKE_CURRENT_BINARY_DIR}/VOverlay)
+        add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../VCodec ${CMAKE_CURRENT_BINARY_DIR}/VCodec)
+    endif()
     add_subdirectory(src)
 endif()
 

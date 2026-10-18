@@ -1,583 +1,441 @@
 #include "VStreamer.h"
 #include "VStreamerVersion.h"
-#include <string>
+#include <array>
+#include <cstdint>
 #include <cstring>
 #include <limits>
+#include <new>
+#include <string>
+#include <type_traits>
 #include <utility>
 
 
-// Macro to check bit in byte.
-#define checkBit(byte, position) ((byte) & (1 << (position)))
 
-
-// Link namespaces.
-using namespace cr::video;
-using namespace std;
-
-
-// Wire sizes of the fixed-size fields. Positions and sizes are int in this
-// API, so the sizes are kept as int too: the bounds checks then compare int
-// with int and never mix in an unsigned type.
-static constexpr int BOOL_SIZE = static_cast<int>(sizeof(bool));
-static constexpr int INT_SIZE = static_cast<int>(sizeof(int));
-static constexpr int FLOAT_SIZE = static_cast<int>(sizeof(float));
-
-
-
-VStreamer::~VStreamer()
+namespace
 {
-    // Empty.
+// Serialized data and commands store int and float values as raw 4 bytes
+// values and bool values as 1 byte.
+static_assert(sizeof(int) == 4, "int must be 4 bytes");
+static_assert(sizeof(float) == 4, "float must be 4 bytes");
+static_assert(sizeof(bool) == 1, "bool must be 1 byte");
+
+/// Data type of an action command.
+constexpr uint8_t COMMAND_DATA_TYPE{0x00};
+/// Data type of a set param command with a numeric value.
+constexpr uint8_t SET_PARAM_DATA_TYPE{0x01};
+/// Data type of serialized params.
+constexpr uint8_t PARAMS_DATA_TYPE{0x02};
+/// Data type of a set param command with a string value.
+constexpr uint8_t SET_STRING_PARAM_DATA_TYPE{0x03};
+/// Position of the major version in commands and in serialized params. The
+/// minor version follows it.
+constexpr int VERSION_POS{1};
+/// Position of the command or param ID in commands.
+constexpr int COMMAND_ID_POS{3};
+/// Position of the param value in set param commands.
+constexpr int COMMAND_VALUE_POS{7};
+/// Size of an int or float value, bytes.
+constexpr int VALUE_SIZE{4};
+/// Size of a bool value, bytes.
+constexpr int FLAG_SIZE{1};
+/// Size of an action command, bytes: header and command ID.
+constexpr int COMMAND_SIZE{COMMAND_VALUE_POS};
+/// Size of a set param command with a numeric value, bytes.
+constexpr int SET_PARAM_SIZE{COMMAND_VALUE_POS + VALUE_SIZE};
+/// Minimum size of a set param command with a string value, bytes: an empty
+/// string is the terminating NUL byte only.
+constexpr int SET_STRING_PARAM_MIN_SIZE{COMMAND_VALUE_POS + 1};
+/// Position of the mask in serialized params.
+constexpr int PARAMS_MASK_POS{3};
+/// Size of the mask in serialized params, bytes.
+constexpr int PARAMS_MASK_SIZE{10};
+/// Size of the header of serialized params: data type, version and mask.
+constexpr int PARAMS_HEADER_SIZE{PARAMS_MASK_POS + PARAMS_MASK_SIZE};
+/// Minimum buffer size for serialization: the header and the smallest field.
+constexpr int PARAMS_MIN_BUFFER_SIZE{PARAMS_HEADER_SIZE + FLAG_SIZE};
+/// Number of bits in a mask byte.
+constexpr int BITS_PER_BYTE{8};
+/// Bit of the first field of a mask byte: the most significant bit.
+constexpr unsigned int FIRST_FIELD_BIT{0x80U};
+/// Number of VStreamerParams fields: one mask bit per field, the other bits
+/// of the mask are reserved and must be 0.
+constexpr int FIELDS_NUMBER{69};
+/// Number of bits of the mask.
+constexpr int MASK_BITS_NUMBER{PARAMS_MASK_SIZE * BITS_PER_BYTE};
+static_assert(FIELDS_NUMBER <= MASK_BITS_NUMBER, "mask is too small");
+static_assert(sizeof(cr::video::VStreamerParamsMask) == FIELDS_NUMBER,
+              "every field of VStreamerParamsMask must be in the field table");
+
+/// First action command ID (VStreamerCommand).
+constexpr int MIN_COMMAND_ID{
+        static_cast<int>(cr::video::VStreamerCommand::RESTART)};
+/// Last action command ID (VStreamerCommand).
+constexpr int MAX_COMMAND_ID{
+        static_cast<int>(cr::video::VStreamerCommand::GENERATE_KEYFRAME)};
+/// First param ID (VStreamerParam).
+constexpr int MIN_PARAM_ID{static_cast<int>(cr::video::VStreamerParam::MODE)};
+/// Last param ID (VStreamerParam).
+constexpr int MAX_PARAM_ID{static_cast<int>(
+        cr::video::VStreamerParam::SERVER_STREAM_MAX_PAYLOAD)};
+
+// VStreamerParams::deserialize(...) assigns the decoded object at the end:
+// the assignment must not throw, so the object is never half changed.
+static_assert(std::is_nothrow_move_assignable<
+              cr::video::VStreamerParams>::value,
+              "move assignment of VStreamerParams must not throw");
+
+
+
+/// Type of a VStreamerParams field in serialized data.
+enum class FieldType : uint8_t
+{
+    /// bool field, 1 byte: 0 - false, any other value - true.
+    FLAG,
+    /// int or float field, 4 bytes in the byte order of the host.
+    VALUE,
+    /// std::string field: the characters and a terminating NUL byte.
+    TEXT
+};
+
+
+
+/// Reference to a VStreamerParams field and to its flag in the mask.
+struct FieldRef
+{
+    /// Pointer to the field: bool, int, float or std::string (see type).
+    void* value{nullptr};
+    /// Type of the field.
+    FieldType type{FieldType::FLAG};
+    /// Flag of the field in VStreamerParamsMask.
+    bool cr::video::VStreamerParamsMask::* selected{nullptr};
+};
+
+
+
+using Mask = cr::video::VStreamerParamsMask;
+
+
+
+/// Make a reference to a bool field.
+FieldRef field(bool& value, bool Mask::* selected)
+{
+    return {&value, FieldType::FLAG, selected};
 }
 
 
 
-string VStreamer::getVersion()
+/// Make a reference to an int field.
+FieldRef field(int& value, bool Mask::* selected)
+{
+    return {&value, FieldType::VALUE, selected};
+}
+
+
+
+/// Make a reference to a float field.
+FieldRef field(float& value, bool Mask::* selected)
+{
+    return {&value, FieldType::VALUE, selected};
+}
+
+
+
+/// Make a reference to a string field.
+FieldRef field(std::string& value, bool Mask::* selected)
+{
+    return {&value, FieldType::TEXT, selected};
+}
+
+
+
+/// Get the table of VStreamerParams fields in the order they are stored in
+/// serialized data: field i has bit (7 - i % 8) of mask byte i / 8.
+std::array<FieldRef, FIELDS_NUMBER> makeFieldTable(
+        cr::video::VStreamerParams& p)
+{
+    return {{
+        field(p.enable, &Mask::enable),
+        field(p.width, &Mask::width),
+        field(p.height, &Mask::height),
+        field(p.directStreamIp, &Mask::directStreamIp),
+        field(p.rtspPort, &Mask::rtspPort),
+        field(p.directStreamPort, &Mask::directStreamPort),
+        field(p.webRtcPort, &Mask::webRtcPort),
+        field(p.hlsPort, &Mask::hlsPort),
+        field(p.srtPort, &Mask::srtPort),
+        field(p.rtmpPort, &Mask::rtmpPort),
+        field(p.metadataPort, &Mask::metadataPort),
+        field(p.rtspEnable, &Mask::rtspEnable),
+        field(p.directStreamEnable, &Mask::directStreamEnable),
+        field(p.webRtcEnable, &Mask::webRtcEnable),
+        field(p.hlsEnable, &Mask::hlsEnable),
+        field(p.srtEnable, &Mask::srtEnable),
+        field(p.rtmpEnable, &Mask::rtmpEnable),
+        field(p.metadataEnable, &Mask::metadataEnable),
+        field(p.rtspMulticastIp, &Mask::rtspMulticastIp),
+        field(p.rtspMulticastPort, &Mask::rtspMulticastPort),
+        field(p.user, &Mask::user),
+        field(p.password, &Mask::password),
+        field(p.suffix, &Mask::suffix),
+        field(p.metadataSuffix, &Mask::metadataSuffix),
+        field(p.minBitrateKbps, &Mask::minBitrateKbps),
+        field(p.maxBitrateKbps, &Mask::maxBitrateKbps),
+        field(p.bitrateKbps, &Mask::bitrateKbps),
+        field(p.bitrateMode, &Mask::bitrateMode),
+        field(p.fps, &Mask::fps),
+        field(p.gop, &Mask::gop),
+        field(p.h264Profile, &Mask::h264Profile),
+        field(p.jpegQuality, &Mask::jpegQuality),
+        field(p.codec, &Mask::codec),
+        field(p.fitMode, &Mask::fitMode),
+        field(p.cycleTimeUs, &Mask::cycleTimeUs),
+        field(p.overlayEnable, &Mask::overlayEnable),
+        field(p.type, &Mask::type),
+        field(p.custom1, &Mask::custom1),
+        field(p.custom2, &Mask::custom2),
+        field(p.custom3, &Mask::custom3),
+        field(p.rtspKey, &Mask::rtspKey),
+        field(p.rtspCert, &Mask::rtspCert),
+        field(p.webRtcKey, &Mask::webRtcKey),
+        field(p.webRtcCert, &Mask::webRtcCert),
+        field(p.hlsKey, &Mask::hlsKey),
+        field(p.hlsCert, &Mask::hlsCert),
+        field(p.rtmpKey, &Mask::rtmpKey),
+        field(p.rtmpCert, &Mask::rtmpCert),
+        field(p.rtspEncryption, &Mask::rtspEncryption),
+        field(p.webRtcEncryption, &Mask::webRtcEncryption),
+        field(p.rtmpEncryption, &Mask::rtmpEncryption),
+        field(p.hlsEncryption, &Mask::hlsEncryption),
+        field(p.logLevel, &Mask::logLevel),
+        field(p.rtspsPort, &Mask::rtspsPort),
+        field(p.rtmpsPort, &Mask::rtmpsPort),
+        field(p.directStreamType, &Mask::directStreamType),
+        field(p.directStreamBitrateKbps, &Mask::directStreamBitrateKbps),
+        field(p.directStreamMaxPayloadSize, &Mask::directStreamMaxPayloadSize),
+        field(p.directStreamPacingMode, &Mask::directStreamPacingMode),
+        field(p.serverStreamType, &Mask::serverStreamType),
+        field(p.multicastTtl, &Mask::multicastTtl),
+        field(p.securityProfile, &Mask::securityProfile),
+        field(p.publicAddress, &Mask::publicAddress),
+        field(p.bindAddress, &Mask::bindAddress),
+        field(p.rtpPortMin, &Mask::rtpPortMin),
+        field(p.rtpPortMax, &Mask::rtpPortMax),
+        field(p.webRtcMediaPort, &Mask::webRtcMediaPort),
+        field(p.corsAllowedOrigin, &Mask::corsAllowedOrigin),
+        field(p.serverStreamMaxPayloadSize, &Mask::serverStreamMaxPayloadSize)
+    }};
+}
+
+
+
+/// Get the index of the mask byte of a field (from the start of the mask).
+int maskByteIndex(int fieldIndex)
+{
+    return fieldIndex / BITS_PER_BYTE;
+}
+
+
+
+/// Get the bit of a field in its mask byte: the first field of a byte is the
+/// most significant bit.
+uint8_t maskBit(int fieldIndex)
+{
+    return static_cast<uint8_t>(
+            FIRST_FIELD_BIT >> (fieldIndex % BITS_PER_BYTE));
+}
+
+
+
+/// Check whether the mask of serialized params has the bit of a field set.
+bool isEncoded(const uint8_t* data, int fieldIndex)
+{
+    return (data[PARAMS_MASK_POS + maskByteIndex(fieldIndex)] &
+            maskBit(fieldIndex)) != 0;
+}
+
+
+
+/// Write a field into serialized data. Return the number of bytes written or
+/// 0 if the field is not written: it doesn't fit into the available bytes,
+/// or it is a string which contains a NUL character (the receiver would end
+/// the string at that character and read the rest of it as the next fields).
+int writeField(const FieldRef& field, uint8_t* data, int available)
+{
+    if (field.type == FieldType::FLAG)
+    {
+        if (available < FLAG_SIZE)
+        {
+            return 0;
+        }
+        data[0] = *static_cast<const bool*>(field.value) ? uint8_t{0x01}
+                                                         : uint8_t{0x00};
+        return FLAG_SIZE;
+    }
+
+    if (field.type == FieldType::VALUE)
+    {
+        if (available < VALUE_SIZE)
+        {
+            return 0;
+        }
+        std::memcpy(data, field.value, VALUE_SIZE);
+        return VALUE_SIZE;
+    }
+
+    // The string takes its characters and the terminator. The length is
+    // compared as size_t: a string longer than INT_MAX is never converted to
+    // int before the check.
+    const std::string& text = *static_cast<const std::string*>(field.value);
+    if (text.size() >= static_cast<size_t>(available) ||
+        text.find('\0') != std::string::npos)
+    {
+        return 0;
+    }
+    std::memcpy(data, text.c_str(), text.size() + 1);
+    return static_cast<int>(text.size()) + 1;
+}
+
+
+
+/// Read a field from serialized data. Return the number of bytes read or 0 if
+/// the field is not complete (a value is cut, a string has no terminator).
+/// Throws std::bad_alloc if memory for a string can't be allocated.
+int readField(const FieldRef& field, const uint8_t* data, int available)
+{
+    if (field.type == FieldType::FLAG)
+    {
+        if (available < FLAG_SIZE)
+        {
+            return 0;
+        }
+        // Any byte other than 0 is true: a bool object must not receive the
+        // byte as it is.
+        *static_cast<bool*>(field.value) = data[0] != 0x00;
+        return FLAG_SIZE;
+    }
+
+    if (field.type == FieldType::VALUE)
+    {
+        if (available < VALUE_SIZE)
+        {
+            return 0;
+        }
+        std::memcpy(field.value, data, VALUE_SIZE);
+        return VALUE_SIZE;
+    }
+
+    // The string ends with the first NUL byte, which must be inside the data.
+    if (available <= 0)
+    {
+        return 0;
+    }
+    const void* end = std::memchr(data, 0, static_cast<size_t>(available));
+    if (end == nullptr)
+    {
+        return 0;
+    }
+    // The terminator is inside the data: the length is < available and fits
+    // into int.
+    const size_t length =
+            static_cast<size_t>(static_cast<const uint8_t*>(end) - data);
+    static_cast<std::string*>(field.value)->assign(
+            reinterpret_cast<const char*>(data), length);
+    return static_cast<int>(length) + 1;
+}
+
+
+
+/// Set a field which is not in serialized data to 0, false or empty string.
+void clearField(const FieldRef& field)
+{
+    if (field.type == FieldType::FLAG)
+    {
+        *static_cast<bool*>(field.value) = false;
+    }
+    else if (field.type == FieldType::VALUE)
+    {
+        // All bits 0: int 0 or float 0.0.
+        std::memset(field.value, 0, VALUE_SIZE);
+    }
+    else
+    {
+        static_cast<std::string*>(field.value)->clear();
+    }
+}
+
+
+
+/// Write the header of a command: data type, version and ID.
+void writeCommandHeader(uint8_t* data, uint8_t dataType, int id)
+{
+    data[0] = dataType;
+    data[VERSION_POS] = static_cast<uint8_t>(VSTREAMER_MAJOR_VERSION);
+    data[VERSION_POS + 1] = static_cast<uint8_t>(VSTREAMER_MINOR_VERSION);
+    std::memcpy(&data[COMMAND_ID_POS], &id, VALUE_SIZE);
+}
+}
+
+
+
+cr::video::VStreamer::~VStreamer() = default;
+
+
+
+std::string cr::video::VStreamer::getVersion()
 {
     return VSTREAMER_VERSION;
 }
 
 
 
-bool VStreamerParams::serialize(uint8_t *data, int bufferSize, int &size, VStreamerParamsMask *mask)
+bool cr::video::VStreamerParams::serialize(
+        uint8_t* data, int bufferSize, int& size, VStreamerParamsMask* mask)
 {
-    // Check buffer size. Header is 13 bytes; one bool is the smallest field.
-    if (data == nullptr || bufferSize < 14)
+    // The size is 0 unless the params are serialized.
+    size = 0;
+
+    // Check pointer and buffer size: the buffer must keep the header and the
+    // smallest field.
+    if (data == nullptr || bufferSize < PARAMS_MIN_BUFFER_SIZE)
     {
-        size = 0;
         return false;
     }
 
-    // Fill header.
-    //
-    // The mask is 10 bytes, not 8: the 8-byte mask of 3.1 had 60 of its 64
-    // bits taken and could not describe the parameters added in 3.2. Growing
-    // it moves the start of the payload, so a 3.1 peer would misread a 3.2
-    // message -- which it never sees, because deserialize() rejects on the
-    // minor version before it reaches the mask. That version check is what
-    // makes the wire format extensible at all.
-    data[0] = 0x02; // Header.
-    data[1] = VSTREAMER_MAJOR_VERSION; // Major version.
-    data[2] = VSTREAMER_MINOR_VERSION; // Minor version.
-    data[3] = 0; // Parameter mask byte 1
-    data[4] = 0; // Parameter mask byte 2
-    data[5] = 0; // Parameter mask byte 3
-    data[6] = 0; // Parameter mask byte 4
-    data[7] = 0; // Parameter mask byte 5
-    data[8] = 0; // Parameter mask byte 6
-    data[9] = 0; // Parameter mask byte 7
-    data[10] = 0; // Parameter mask byte 8
-    data[11] = 0; // Parameter mask byte 9
-    data[12] = 0; // Parameter mask byte 10
-
-    // If mask is not initialized then encode all parameters.
-    VStreamerParamsMask defaultMask;
-    if (mask == nullptr)
-    {
-        mask = &defaultMask;
-    }
-
-    // Fill data.
-    int pos = 13;
-
-    // Inclusive (>=) on purpose: a buffer that is exactly the size of the
-    // next field must still accept it. The previous `>` dropped the last
-    // field whenever the caller sized the buffer to the exact payload.
-    // Written as a subtraction: pos never passes bufferSize, so
-    // bufferSize - pos cannot overflow, while pos + n could.
-    auto fits = [&](int n)
-    {
-        return bufferSize - pos >= n;
-    };
-
-    // A string takes its characters plus the terminator. The length is
-    // compared as size_t: a string longer than INT_MAX must not wrap into a
-    // small or negative int that passes the check and overruns the buffer.
-    auto fitsString = [&](const std::string& value)
-    {
-        return value.size() < static_cast<size_t>(bufferSize - pos);
-    };
-
-    if (mask->enable && fits(BOOL_SIZE))
-    {
-        memcpy(&data[pos], &enable, sizeof(bool));
-        pos += BOOL_SIZE;
-        data[3] |= (1 << 7);
-    }
-
-    if (mask->width && fits(INT_SIZE))
-    {
-        memcpy(&data[pos], &width, sizeof(int));
-        pos += INT_SIZE;
-        data[3] |= (1 << 6);
-    }
-
-    if (mask->height && fits(INT_SIZE))
-    {
-        memcpy(&data[pos], &height, sizeof(int));
-        pos += INT_SIZE;
-        data[3] |= (1 << 5);
-    }
-
-    if (mask->directStreamIp && fitsString(directStreamIp))
-    {
-        memcpy(&data[pos], directStreamIp.c_str(), directStreamIp.size() + 1);
-        pos += static_cast<int>(directStreamIp.size()) + 1;
-        data[3] |= (1 << 4);
-    }
-
-    if (mask->rtspPort && fits(INT_SIZE))
-    {
-        memcpy(&data[pos], &rtspPort, sizeof(int));
-        pos += INT_SIZE;
-        data[3] |= (1 << 3);
-    }
-
-    if (mask->directStreamPort && fits(INT_SIZE))
-    {
-        memcpy(&data[pos], &directStreamPort, sizeof(int));
-        pos += INT_SIZE;
-        data[3] |= (1 << 2);
-    }
-
-    if (mask->webRtcPort && fits(INT_SIZE))
-    {
-        memcpy(&data[pos], &webRtcPort, sizeof(int));
-        pos += INT_SIZE;
-        data[3] |= (1 << 1);
-    }
-
-    if (mask->hlsPort && fits(INT_SIZE))
-    {
-        memcpy(&data[pos], &hlsPort, sizeof(int));
-        pos += INT_SIZE;
-        data[3] |= (1 << 0);
-    }
-
-    if (mask->srtPort && fits(INT_SIZE))
-    {
-        memcpy(&data[pos], &srtPort, sizeof(int));
-        pos += INT_SIZE;
-        data[4] |= (1 << 7);
-    }
-
-    if (mask->rtmpPort && fits(INT_SIZE))
-    {
-        memcpy(&data[pos], &rtmpPort, sizeof(int));
-        pos += INT_SIZE;
-        data[4] |= (1 << 6);
-    }
-
-    if (mask->metadataPort && fits(INT_SIZE))
-    {
-        memcpy(&data[pos], &metadataPort, sizeof(int));
-        pos += INT_SIZE;
-        data[4] |= (1 << 5);
-    }
-
-    if (mask->rtspEnable && fits(BOOL_SIZE))
-    {
-        memcpy(&data[pos], &rtspEnable, sizeof(bool));
-        pos += BOOL_SIZE;
-        data[4] |= (1 << 4);
-    }
-
-    if (mask->directStreamEnable && fits(BOOL_SIZE))
-    {
-        memcpy(&data[pos], &directStreamEnable, sizeof(bool));
-        pos += BOOL_SIZE;
-        data[4] |= (1 << 3);
-    }
-
-    if (mask->webRtcEnable && fits(BOOL_SIZE))
-    {
-        memcpy(&data[pos], &webRtcEnable, sizeof(bool));
-        pos += BOOL_SIZE;
-        data[4] |= (1 << 2);
-    }
-
-    if (mask->hlsEnable && fits(BOOL_SIZE))
-    {
-        memcpy(&data[pos], &hlsEnable, sizeof(bool));
-        pos += BOOL_SIZE;
-        data[4] |= (1 << 1);
-    }
-
-    if (mask->srtEnable && fits(BOOL_SIZE))
-    {
-        memcpy(&data[pos], &srtEnable, sizeof(bool));
-        pos += BOOL_SIZE;
-        data[4] |= (1 << 0);
-    }
-
-    if (mask->rtmpEnable && fits(BOOL_SIZE))
-    {
-        memcpy(&data[pos], &rtmpEnable, sizeof(bool));
-        pos += BOOL_SIZE;
-        data[5] |= (1 << 7);
-    }
-
-    if (mask->metadataEnable && fits(BOOL_SIZE))
-    {
-        memcpy(&data[pos], &metadataEnable, sizeof(bool));
-        pos += BOOL_SIZE;
-        data[5] |= (1 << 6);
-    }
-
-    if (mask->rtspMulticastIp && fitsString(rtspMulticastIp))
-    {
-        memcpy(&data[pos], rtspMulticastIp.c_str(), rtspMulticastIp.size() + 1);
-        pos += static_cast<int>(rtspMulticastIp.size()) + 1;
-        data[5] |= (1 << 5);
-    }
-
-    if (mask->rtspMulticastPort && fits(INT_SIZE))
-    {
-        memcpy(&data[pos], &rtspMulticastPort, sizeof(int));
-        pos += INT_SIZE;
-        data[5] |= (1 << 4);
-    }
-
-    if (mask->user && fitsString(user))
-    {
-        memcpy(&data[pos], user.c_str(), user.size() + 1);
-        pos += static_cast<int>(user.size()) + 1;
-        data[5] |= (1 << 3);
-    }
-
-    if (mask->password && fitsString(password))
-    {
-        memcpy(&data[pos], password.c_str(), password.size() + 1);
-        pos += static_cast<int>(password.size()) + 1;
-        data[5] |= (1 << 2);
-    }
-
-    if (mask->suffix && fitsString(suffix))
-    {
-        memcpy(&data[pos], suffix.c_str(), suffix.size() + 1);
-        pos += static_cast<int>(suffix.size()) + 1;
-        data[5] |= (1 << 1);
-    }
-
-    if (mask->metadataSuffix && fitsString(metadataSuffix))
-    {
-        memcpy(&data[pos], metadataSuffix.c_str(), metadataSuffix.size() + 1);
-        pos += static_cast<int>(metadataSuffix.size()) + 1;
-        data[5] |= (1 << 0);
-    }
-
-    if (mask->minBitrateKbps && fits(INT_SIZE))
-    {
-        memcpy(&data[pos], &minBitrateKbps, sizeof(int));
-        pos += INT_SIZE;
-        data[6] |= (1 << 7);
-    }
-
-    if (mask->maxBitrateKbps && fits(INT_SIZE))
-    {
-        memcpy(&data[pos], &maxBitrateKbps, sizeof(int));
-        pos += INT_SIZE;
-        data[6] |= (1 << 6);
-    }
-
-    if (mask->bitrateKbps && fits(INT_SIZE))
-    {
-        memcpy(&data[pos], &bitrateKbps, sizeof(int));
-        pos += INT_SIZE;
-        data[6] |= (1 << 5);
-    }
-
-    if (mask->bitrateMode && fits(INT_SIZE))
-    {
-        memcpy(&data[pos], &bitrateMode, sizeof(int));
-        pos += INT_SIZE;
-        data[6] |= (1 << 4);
-    }
-
-    if (mask->fps && fits(FLOAT_SIZE))
-    {
-        memcpy(&data[pos], &fps, sizeof(float));
-        pos += FLOAT_SIZE;
-        data[6] |= (1 << 3);
-    }
-
-    if (mask->gop && fits(INT_SIZE))
-    {
-        memcpy(&data[pos], &gop, sizeof(int));
-        pos += INT_SIZE;
-        data[6] |= (1 << 2);
-    }
-
-    if (mask->h264Profile && fits(INT_SIZE))
-    {
-        memcpy(&data[pos], &h264Profile, sizeof(int));
-        pos += INT_SIZE;
-        data[6] |= (1 << 1);
-    }
-
-    if (mask->jpegQuality && fits(INT_SIZE))
-    {
-        memcpy(&data[pos], &jpegQuality, sizeof(int));
-        pos += INT_SIZE;
-        data[6] |= (1 << 0);
-    }
-
-    if (mask->codec && fitsString(codec))
-    {
-        memcpy(&data[pos], codec.c_str(), codec.size() + 1);
-        pos += static_cast<int>(codec.size()) + 1;
-        data[7] |= (1 << 7);
-    }
-
-    if (mask->fitMode && fits(INT_SIZE))
-    {
-        memcpy(&data[pos], &fitMode, sizeof(int));
-        pos += INT_SIZE;
-        data[7] |= (1 << 6);
-    }
-
-    if (mask->cycleTimeUs && fits(INT_SIZE))
-    {
-        memcpy(&data[pos], &cycleTimeUs, sizeof(int));
-        pos += INT_SIZE;
-        data[7] |= (1 << 5);
-    }
-
-    if (mask->overlayEnable && fits(BOOL_SIZE))
-    {
-        memcpy(&data[pos], &overlayEnable, sizeof(bool));
-        pos += BOOL_SIZE;
-        data[7] |= (1 << 4);
-    }
-
-    if (mask->type && fits(INT_SIZE))
-    {
-        memcpy(&data[pos], &type, sizeof(int));
-        pos += INT_SIZE;
-        data[7] |= (1 << 3);
-    }
-
-    if (mask->custom1 && fits(FLOAT_SIZE))
-    {
-        memcpy(&data[pos], &custom1, sizeof(float));
-        pos += FLOAT_SIZE;
-        data[7] |= (1 << 2);
-    }
-
-    if (mask->custom2 && fits(FLOAT_SIZE))
-    {
-        memcpy(&data[pos], &custom2, sizeof(float));
-        pos += FLOAT_SIZE;
-        data[7] |= (1 << 1);
-    }
-
-    if (mask->custom3 && fits(FLOAT_SIZE))
-    {
-        memcpy(&data[pos], &custom3, sizeof(float));
-        pos += FLOAT_SIZE;
-        data[7] |= (1 << 0);
-    }
-
-    if (mask->rtspKey && fitsString(rtspKey))
-    {
-        memcpy(&data[pos], rtspKey.c_str(), rtspKey.size() + 1);
-        pos += static_cast<int>(rtspKey.size()) + 1;
-        data[8] |= (1 << 7);
-    }
-
-    if (mask->rtspCert && fitsString(rtspCert))
-    {
-        memcpy(&data[pos], rtspCert.c_str(), rtspCert.size() + 1);
-        pos += static_cast<int>(rtspCert.size()) + 1;
-        data[8] |= (1 << 6);
-    }
-
-    if (mask->webRtcKey && fitsString(webRtcKey))
-    {
-        memcpy(&data[pos], webRtcKey.c_str(), webRtcKey.size() + 1);
-        pos += static_cast<int>(webRtcKey.size()) + 1;
-        data[8] |= (1 << 5);
-    }
-
-    if (mask->webRtcCert && fitsString(webRtcCert))
-    {
-        memcpy(&data[pos], webRtcCert.c_str(), webRtcCert.size() + 1);
-        pos += static_cast<int>(webRtcCert.size()) + 1;
-        data[8] |= (1 << 4);
-    }
-
-    if (mask->hlsKey && fitsString(hlsKey))
-    {
-        memcpy(&data[pos], hlsKey.c_str(), hlsKey.size() + 1);
-        pos += static_cast<int>(hlsKey.size()) + 1;
-        data[8] |= (1 << 3);
-    }
-
-    if (mask->hlsCert && fitsString(hlsCert))
-    {
-        memcpy(&data[pos], hlsCert.c_str(), hlsCert.size() + 1);
-        pos += static_cast<int>(hlsCert.size()) + 1;
-        data[8] |= (1 << 2);
-    }
-
-    if (mask->rtmpKey && fitsString(rtmpKey))
-    {
-        memcpy(&data[pos], rtmpKey.c_str(), rtmpKey.size() + 1);
-        pos += static_cast<int>(rtmpKey.size()) + 1;
-        data[8] |= (1 << 1);
-    }
-
-    if (mask->rtmpCert && fitsString(rtmpCert))
-    {
-        memcpy(&data[pos], rtmpCert.c_str(), rtmpCert.size() + 1);
-        pos += static_cast<int>(rtmpCert.size()) + 1;
-        data[8] |= (1 << 0);
-    }
-
-    if (mask->rtspEncryption && fitsString(rtspEncryption))
-    {
-        memcpy(&data[pos], rtspEncryption.c_str(), rtspEncryption.size() + 1);
-        pos += static_cast<int>(rtspEncryption.size()) + 1;
-        data[9] |= (1 << 7);
-    }
-
-    if (mask->webRtcEncryption && fitsString(webRtcEncryption))
-    {
-        memcpy(&data[pos], webRtcEncryption.c_str(), webRtcEncryption.size() + 1);
-        pos += static_cast<int>(webRtcEncryption.size()) + 1;
-        data[9] |= (1 << 6);
-    }
-
-    if (mask->rtmpEncryption && fitsString(rtmpEncryption))
-    {
-        memcpy(&data[pos], rtmpEncryption.c_str(), rtmpEncryption.size() + 1);
-        pos += static_cast<int>(rtmpEncryption.size()) + 1;
-        data[9] |= (1 << 5);
-    }
-
-    if (mask->hlsEncryption && fitsString(hlsEncryption))
-    {
-        memcpy(&data[pos], hlsEncryption.c_str(), hlsEncryption.size() + 1);
-        pos += static_cast<int>(hlsEncryption.size()) + 1;
-        data[9] |= (1 << 4);
-    }
-
-    if (mask->logLevel && fits(INT_SIZE))
-    {
-        memcpy(&data[pos], &logLevel, sizeof(int));
-        pos += INT_SIZE;
-        data[9] |= (1 << 3);
-    }
-
-    if (mask->rtspsPort && fits(INT_SIZE))
-    {
-        memcpy(&data[pos], &rtspsPort, sizeof(int));
-        pos += INT_SIZE;
-        data[9] |= (1 << 2);
-    }
-
-    if (mask->rtmpsPort && fits(INT_SIZE))
-    {
-        memcpy(&data[pos], &rtmpsPort, sizeof(int));
-        pos += INT_SIZE;
-        data[9] |= (1 << 1);
-    }
-
-    if (mask->directStreamType && fitsString(directStreamType))
-    {
-        memcpy(&data[pos], directStreamType.c_str(), directStreamType.size() + 1);
-        pos += static_cast<int>(directStreamType.size()) + 1;
-        data[9] |= (1 << 0);
-    }
-
-    if (mask->directStreamBitrateKbps && fits(INT_SIZE))
-    {
-        memcpy(&data[pos], &directStreamBitrateKbps, sizeof(int));
-        pos += INT_SIZE;
-        data[10] |= (1 << 7);
-    }
-
-    if (mask->directStreamMaxPayloadSize && fits(INT_SIZE))
-    {
-        memcpy(&data[pos], &directStreamMaxPayloadSize, sizeof(int));
-        pos += INT_SIZE;
-        data[10] |= (1 << 6);
-    }
-
-    if (mask->directStreamPacingMode && fits(INT_SIZE))
-    {
-        memcpy(&data[pos], &directStreamPacingMode, sizeof(int));
-        pos += INT_SIZE;
-        data[10] |= (1 << 5);
-    }
-
-    if (mask->serverStreamType && fitsString(serverStreamType))
-    {
-        memcpy(&data[pos], serverStreamType.c_str(), serverStreamType.size() + 1);
-        pos += static_cast<int>(serverStreamType.size()) + 1;
-        data[10] |= (1 << 4);
-    }
-
-    if (mask->multicastTtl && fits(INT_SIZE))
-    {
-        memcpy(&data[pos], &multicastTtl, sizeof(int));
-        pos += INT_SIZE;
-        data[10] |= (1 << 3);
-    }
-
-    if (mask->securityProfile && fitsString(securityProfile))
-    {
-        memcpy(&data[pos], securityProfile.c_str(), securityProfile.size() + 1);
-        pos += static_cast<int>(securityProfile.size()) + 1;
-        data[10] |= (1 << 2);
-    }
-
-    if (mask->publicAddress && fitsString(publicAddress))
-    {
-        memcpy(&data[pos], publicAddress.c_str(), publicAddress.size() + 1);
-        pos += static_cast<int>(publicAddress.size()) + 1;
-        data[10] |= (1 << 1);
-    }
-
-    if (mask->bindAddress && fitsString(bindAddress))
-    {
-        memcpy(&data[pos], bindAddress.c_str(), bindAddress.size() + 1);
-        pos += static_cast<int>(bindAddress.size()) + 1;
-        data[10] |= (1 << 0);
-    }
-
-    if (mask->rtpPortMin && fits(INT_SIZE))
-    {
-        memcpy(&data[pos], &rtpPortMin, sizeof(int));
-        pos += INT_SIZE;
-        data[11] |= (1 << 7);
-    }
-
-    if (mask->rtpPortMax && fits(INT_SIZE))
-    {
-        memcpy(&data[pos], &rtpPortMax, sizeof(int));
-        pos += INT_SIZE;
-        data[11] |= (1 << 6);
-    }
-
-    if (mask->webRtcMediaPort && fits(INT_SIZE))
-    {
-        memcpy(&data[pos], &webRtcMediaPort, sizeof(int));
-        pos += INT_SIZE;
-        data[11] |= (1 << 5);
-    }
-
-    if (mask->corsAllowedOrigin && fitsString(corsAllowedOrigin))
-    {
-        memcpy(&data[pos], corsAllowedOrigin.c_str(), corsAllowedOrigin.size() + 1);
-        pos += static_cast<int>(corsAllowedOrigin.size()) + 1;
-        data[11] |= (1 << 4);
-    }
-
-    if (mask->serverStreamMaxPayloadSize && fits(INT_SIZE))
-    {
-        memcpy(&data[pos], &serverStreamMaxPayloadSize, sizeof(int));
-        pos += INT_SIZE;
-        data[11] |= (1 << 3);
+    // All fields are selected by default.
+    const VStreamerParamsMask defaultMask;
+    const VStreamerParamsMask& selection =
+            mask == nullptr ? defaultMask : *mask;
+
+    // Header: data type, version and mask (set bit by bit below). The
+    // version is a part of the format: the receiver accepts only data of its
+    // own major and minor version.
+    data[0] = PARAMS_DATA_TYPE;
+    data[VERSION_POS] = static_cast<uint8_t>(VSTREAMER_MAJOR_VERSION);
+    data[VERSION_POS + 1] = static_cast<uint8_t>(VSTREAMER_MINOR_VERSION);
+    std::memset(&data[PARAMS_MASK_POS], 0, PARAMS_MASK_SIZE);
+
+    // Serialize the selected fields. A field which is not written doesn't get
+    // its mask bit, and the next fields are written if they fit. The
+    // position never exceeds the buffer size, so bufferSize - pos doesn't
+    // overflow.
+    const auto fields = makeFieldTable(*this);
+    int pos = PARAMS_HEADER_SIZE;
+    for (int i = 0; i < FIELDS_NUMBER; ++i)
+    {
+        const FieldRef& field = fields[static_cast<size_t>(i)];
+        if (!(selection.*field.selected))
+        {
+            continue;
+        }
+
+        const int written = writeField(field, &data[pos], bufferSize - pos);
+        if (written == 0)
+        {
+            continue;
+        }
+        uint8_t& maskByte = data[PARAMS_MASK_POS + maskByteIndex(i)];
+        maskByte = static_cast<uint8_t>(maskByte | maskBit(i));
+        pos += written;
     }
 
     size = pos;
@@ -587,1233 +445,237 @@ bool VStreamerParams::serialize(uint8_t *data, int bufferSize, int &size, VStrea
 
 
 
-// Read a null-terminated string from the buffer with bounds checking.
-// Advances pos past the terminator. Returns false if no terminator is found
-// within [pos, dataSize) (protects against out-of-bounds reads and overflow).
-static bool readString(const uint8_t* data, int dataSize, int& pos, std::string& out)
+bool cr::video::VStreamerParams::deserialize(uint8_t* data, int dataSize)
 {
-    if (pos < 0 || pos >= dataSize)
-    {
-        return false;
-    }
-    // Positive here, so the conversion to size_t keeps the value.
-    const size_t remaining = static_cast<size_t>(dataSize - pos);
-    const void* nullPos = memchr(&data[pos], 0, remaining);
-    if (nullPos == nullptr)
-    {
-        return false; // No null terminator within the buffer bounds.
-    }
-    // The terminator lies inside [pos, dataSize): length < remaining, so
-    // pos + length + 1 <= dataSize and the int arithmetic below is exact.
-    const size_t length = static_cast<size_t>(
-        static_cast<const uint8_t*>(nullPos) - &data[pos]);
-    out.assign(reinterpret_cast<const char*>(&data[pos]), length);
-    pos += static_cast<int>(length) + 1;
-    return true;
-}
-
-
-
-namespace
-{
-
-// Restores the parameters unless commit() was called: deserialize() replaces
-// the object as a whole or leaves it as it was.
-class ParamsRollback
-{
-public:
-    explicit ParamsRollback(VStreamerParams& target) : m_target(target), m_saved(target)
-    {
-    }
-
-    ParamsRollback(const ParamsRollback&) = delete;
-    ParamsRollback& operator=(const ParamsRollback&) = delete;
-
-    ~ParamsRollback()
-    {
-        if (!m_committed)
-        {
-            m_target = std::move(m_saved);
-        }
-    }
-
-    void commit()
-    {
-        m_committed = true;
-    }
-
-private:
-    VStreamerParams& m_target;
-    VStreamerParams m_saved;
-    bool m_committed{false};
-};
-
-} // namespace
-
-
-
-bool VStreamerParams::deserialize(uint8_t *data, int dataSize)
-{
-    // Check data size.
-    if (data == nullptr || dataSize < 14)
+    // Check pointer and data size: the header must be complete.
+    if (data == nullptr || dataSize < PARAMS_HEADER_SIZE)
     {
         return false;
     }
 
-    // Check header.
-    if (data[0] != 0x02)
+    // Check data type and version. The layout of the data (mask size, order
+    // of the fields) belongs to a major and minor version: data of another
+    // version would be read with wrong offsets.
+    if (data[0] != PARAMS_DATA_TYPE ||
+        data[VERSION_POS] != VSTREAMER_MAJOR_VERSION ||
+        data[VERSION_POS + 1] != VSTREAMER_MINOR_VERSION)
     {
         return false;
     }
 
-    // Decode version.
-    //
-    // Both halves are checked, and the minor half matters as much as the
-    // major: the parameter mask grew from 8 bytes to 10 in 3.2, so a 3.1
-    // message read with 3.2 offsets would decode garbage into every field.
-    // Rejecting it here is what keeps the format extensible.
-    if (data[1] != VSTREAMER_MAJOR_VERSION || data[2] != VSTREAMER_MINOR_VERSION)
+    // Check that the mask has no bits of unknown fields.
+    for (int i = FIELDS_NUMBER; i < MASK_BITS_NUMBER; ++i)
+    {
+        if (isEncoded(data, i))
+        {
+            return false;
+        }
+    }
+
+    // Decode into a temporary object: this object is changed only if the
+    // whole data is valid. Strings need memory: an allocation failure is
+    // reported as a deserialization failure.
+    try
+    {
+        VStreamerParams result;
+        const auto fields = makeFieldTable(result);
+        int pos = PARAMS_HEADER_SIZE;
+        for (int i = 0; i < FIELDS_NUMBER; ++i)
+        {
+            const FieldRef& field = fields[static_cast<size_t>(i)];
+            if (!isEncoded(data, i))
+            {
+                clearField(field);
+                continue;
+            }
+
+            // The position never exceeds the data size, so dataSize - pos
+            // doesn't overflow.
+            const int read = readField(field, &data[pos], dataSize - pos);
+            if (read == 0)
+            {
+                return false;
+            }
+            pos += read;
+        }
+
+        // The move assignment doesn't throw (see static_assert above).
+        *this = std::move(result);
+    }
+    catch (const std::bad_alloc&)
     {
         return false;
     }
-
-    // All or nothing: a message that fails halfway (a truncated field, a
-    // string without its terminator) must not leave a mixture of old and new
-    // values in the object.
-    ParamsRollback rollback(*this);
-
-    // Start of actual data.
-    int pos = 13;
-
-    if (checkBit(data[3], 7))
-    {
-        if (dataSize - pos < BOOL_SIZE)
-        {
-            return false;
-        }
-        // Normalised, not memcpy'd: a bool holding any byte other than 0
-        // or 1 is undefined behaviour, and the wire is attacker-supplied.
-        enable = (data[pos] != 0);
-        pos += BOOL_SIZE;
-    }
-    else
-    {
-        enable = false;
-    }
-
-    if (checkBit(data[3], 6))
-    {
-        if (dataSize - pos < INT_SIZE)
-        {
-            return false;
-        }
-        memcpy(&width, &data[pos], sizeof(int));
-        pos += INT_SIZE;
-    }
-    else
-    {
-        width = 0;
-    }
-
-    if (checkBit(data[3], 5))
-    {
-        if (dataSize - pos < INT_SIZE)
-        {
-            return false;
-        }
-        memcpy(&height, &data[pos], sizeof(int));
-        pos += INT_SIZE;
-    }
-    else
-    {
-        height = 0;
-    }
-
-    if (checkBit(data[3], 4))
-    {
-        if (!readString(data, dataSize, pos, directStreamIp))
-        {
-            return false;
-        }
-    }
-    else
-    {
-        directStreamIp = "";
-    }
-
-    if (checkBit(data[3], 3))
-    {
-        if (dataSize - pos < INT_SIZE)
-        {
-            return false;
-        }
-        memcpy(&rtspPort, &data[pos], sizeof(int));
-        pos += INT_SIZE;
-    }
-    else
-    {
-        rtspPort = 0;
-    }
-
-    if (checkBit(data[3], 2))
-    {
-        if (dataSize - pos < INT_SIZE)
-        {
-            return false;
-        }
-        memcpy(&directStreamPort, &data[pos], sizeof(int));
-        pos += INT_SIZE;
-    }
-    else
-    {
-        directStreamPort = 0;
-    }
-
-    if (checkBit(data[3], 1))
-    {
-        if (dataSize - pos < INT_SIZE)
-        {
-            return false;
-        }
-        memcpy(&webRtcPort, &data[pos], sizeof(int));
-        pos += INT_SIZE;
-    }
-    else
-    {
-        webRtcPort = 0;
-    }
-
-    if (checkBit(data[3], 0))
-    {
-        if (dataSize - pos < INT_SIZE)
-        {
-            return false;
-        }
-        memcpy(&hlsPort, &data[pos], sizeof(int));
-        pos += INT_SIZE;
-    }
-    else
-    {
-        hlsPort = 0;
-    }
-
-    if (checkBit(data[4], 7))
-    {
-        if (dataSize - pos < INT_SIZE)
-        {
-            return false;
-        }
-        memcpy(&srtPort, &data[pos], sizeof(int));
-        pos += INT_SIZE;
-    }
-    else
-    {
-        srtPort = 0;
-    }
-
-    if (checkBit(data[4], 6))
-    {
-        if (dataSize - pos < INT_SIZE)
-        {
-            return false;
-        }
-        memcpy(&rtmpPort, &data[pos], sizeof(int));
-        pos += INT_SIZE;
-    }
-    else
-    {
-        rtmpPort = 0;
-    }
-
-    if (checkBit(data[4], 5))
-    {
-        if (dataSize - pos < INT_SIZE)
-        {
-            return false;
-        }
-        memcpy(&metadataPort, &data[pos], sizeof(int));
-        pos += INT_SIZE;
-    }
-    else
-    {
-        metadataPort = 0;
-    }
-
-    if (checkBit(data[4], 4))
-    {
-        if (dataSize - pos < BOOL_SIZE)
-        {
-            return false;
-        }
-        // Normalised, not memcpy'd: a bool holding any byte other than 0
-        // or 1 is undefined behaviour, and the wire is attacker-supplied.
-        rtspEnable = (data[pos] != 0);
-        pos += BOOL_SIZE;
-    }
-    else
-    {
-        rtspEnable = false;
-    }
-
-    if (checkBit(data[4], 3))
-    {
-        if (dataSize - pos < BOOL_SIZE)
-        {
-            return false;
-        }
-        // Normalised, not memcpy'd: a bool holding any byte other than 0
-        // or 1 is undefined behaviour, and the wire is attacker-supplied.
-        directStreamEnable = (data[pos] != 0);
-        pos += BOOL_SIZE;
-    }
-    else
-    {
-        directStreamEnable = false;
-    }
-
-    if (checkBit(data[4], 2))
-    {
-        if (dataSize - pos < BOOL_SIZE)
-        {
-            return false;
-        }
-        // Normalised, not memcpy'd: a bool holding any byte other than 0
-        // or 1 is undefined behaviour, and the wire is attacker-supplied.
-        webRtcEnable = (data[pos] != 0);
-        pos += BOOL_SIZE;
-    }
-    else
-    {
-        webRtcEnable = false;
-    }
-
-    if (checkBit(data[4], 1))
-    {
-        if (dataSize - pos < BOOL_SIZE)
-        {
-            return false;
-        }
-        // Normalised, not memcpy'd: a bool holding any byte other than 0
-        // or 1 is undefined behaviour, and the wire is attacker-supplied.
-        hlsEnable = (data[pos] != 0);
-        pos += BOOL_SIZE;
-    }
-    else
-    {
-        hlsEnable = false;
-    }
-
-    if (checkBit(data[4], 0))
-    {
-        if (dataSize - pos < BOOL_SIZE)
-        {
-            return false;
-        }
-        // Normalised, not memcpy'd: a bool holding any byte other than 0
-        // or 1 is undefined behaviour, and the wire is attacker-supplied.
-        srtEnable = (data[pos] != 0);
-        pos += BOOL_SIZE;
-    }
-    else
-    {
-        srtEnable = false;
-    }
-
-    if (checkBit(data[5], 7))
-    {
-        if (dataSize - pos < BOOL_SIZE)
-        {
-            return false;
-        }
-        // Normalised, not memcpy'd: a bool holding any byte other than 0
-        // or 1 is undefined behaviour, and the wire is attacker-supplied.
-        rtmpEnable = (data[pos] != 0);
-        pos += BOOL_SIZE;
-    }
-    else
-    {
-        rtmpEnable = false;
-    }
-
-    if (checkBit(data[5], 6))
-    {
-        if (dataSize - pos < BOOL_SIZE)
-        {
-            return false;
-        }
-        // Normalised, not memcpy'd: a bool holding any byte other than 0
-        // or 1 is undefined behaviour, and the wire is attacker-supplied.
-        metadataEnable = (data[pos] != 0);
-        pos += BOOL_SIZE;
-    }
-    else
-    {
-        metadataEnable = false;
-    }
-
-    if (checkBit(data[5], 5))
-    {
-        if (!readString(data, dataSize, pos, rtspMulticastIp))
-        {
-            return false;
-        }
-    }
-    else
-    {
-        rtspMulticastIp = "";
-    }
-
-    if (checkBit(data[5], 4))
-    {
-        if (dataSize - pos < INT_SIZE)
-        {
-            return false;
-        }
-        memcpy(&rtspMulticastPort, &data[pos], sizeof(int));
-        pos += INT_SIZE;
-    }
-    else
-    {
-        rtspMulticastPort = 0;
-    }
-
-    if (checkBit(data[5], 3))
-    {
-        if (!readString(data, dataSize, pos, user))
-        {
-            return false;
-        }
-    }
-    else
-    {
-        user = "";
-    }
-
-    if (checkBit(data[5], 2))
-    {
-        if (!readString(data, dataSize, pos, password))
-        {
-            return false;
-        }
-    }
-    else
-    {
-        password = "";
-    }
-
-    if (checkBit(data[5], 1))
-    {
-        if (!readString(data, dataSize, pos, suffix))
-        {
-            return false;
-        }
-    }
-    else
-    {
-        suffix = "";
-    }
-
-    if (checkBit(data[5], 0))
-    {
-        if (!readString(data, dataSize, pos, metadataSuffix))
-        {
-            return false;
-        }
-    }
-    else
-    {
-        metadataSuffix = "";
-    }
-
-    if (checkBit(data[6], 7))
-    {
-        if (dataSize - pos < INT_SIZE)
-        {
-            return false;
-        }
-        memcpy(&minBitrateKbps, &data[pos], sizeof(int));
-        pos += INT_SIZE;
-    }
-    else
-    {
-        minBitrateKbps = 0;
-    }
-
-    if (checkBit(data[6], 6))
-    {
-        if (dataSize - pos < INT_SIZE)
-        {
-            return false;
-        }
-        memcpy(&maxBitrateKbps, &data[pos], sizeof(int));
-        pos += INT_SIZE;
-    }
-    else
-    {
-        maxBitrateKbps = 0;
-    }
-
-    if (checkBit(data[6], 5))
-    {
-        if (dataSize - pos < INT_SIZE)
-        {
-            return false;
-        }
-        memcpy(&bitrateKbps, &data[pos], sizeof(int));
-        pos += INT_SIZE;
-    }
-    else
-    {
-        bitrateKbps = 0;
-    }
-
-    if (checkBit(data[6], 4))
-    {
-        if (dataSize - pos < INT_SIZE)
-        {
-            return false;
-        }
-        memcpy(&bitrateMode, &data[pos], sizeof(int));
-        pos += INT_SIZE;
-    }
-    else
-    {
-        bitrateMode = 0;
-    }
-
-    if (checkBit(data[6], 3))
-    {
-        if (dataSize - pos < FLOAT_SIZE)
-        {
-            return false;
-        }
-        memcpy(&fps, &data[pos], sizeof(float));
-        pos += FLOAT_SIZE;
-    }
-    else
-    {
-        fps = 0;
-    }
-
-    if (checkBit(data[6], 2))
-    {
-        if (dataSize - pos < INT_SIZE)
-        {
-            return false;
-        }
-        memcpy(&gop, &data[pos], sizeof(int));
-        pos += INT_SIZE;
-    }
-    else
-    {
-        gop = 0;
-    }
-
-    if (checkBit(data[6], 1))
-    {
-        if (dataSize - pos < INT_SIZE)
-        {
-            return false;
-        }
-        memcpy(&h264Profile, &data[pos], sizeof(int));
-        pos += INT_SIZE;
-    }
-    else
-    {
-        h264Profile = 0;
-    }
-
-    if (checkBit(data[6], 0))
-    {
-        if (dataSize - pos < INT_SIZE)
-        {
-            return false;
-        }
-        memcpy(&jpegQuality, &data[pos], sizeof(int));
-        pos += INT_SIZE;
-    }
-    else
-    {
-        jpegQuality = 0;
-    }
-
-    if (checkBit(data[7], 7))
-    {
-        if (!readString(data, dataSize, pos, codec))
-        {
-            return false;
-        }
-    }
-    else
-    {
-        codec = "";
-    }
-
-    if (checkBit(data[7], 6))
-    {
-        if (dataSize - pos < INT_SIZE)
-        {
-            return false;
-        }
-        memcpy(&fitMode, &data[pos], sizeof(int));
-        pos += INT_SIZE;
-    }
-    else
-    {
-        fitMode = 0;
-    }
-
-    if (checkBit(data[7], 5))
-    {
-        if (dataSize - pos < INT_SIZE)
-        {
-            return false;
-        }
-        memcpy(&cycleTimeUs, &data[pos], sizeof(int));
-        pos += INT_SIZE;
-    }
-    else
-    {
-        cycleTimeUs = 0;
-    }
-
-    if (checkBit(data[7], 4))
-    {
-        if (dataSize - pos < BOOL_SIZE)
-        {
-            return false;
-        }
-        // Normalised, not memcpy'd: a bool holding any byte other than 0
-        // or 1 is undefined behaviour, and the wire is attacker-supplied.
-        overlayEnable = (data[pos] != 0);
-        pos += BOOL_SIZE;
-    }
-    else
-    {
-        overlayEnable = false;
-    }
-
-    if (checkBit(data[7], 3))
-    {
-        if (dataSize - pos < INT_SIZE)
-        {
-            return false;
-        }
-        memcpy(&type, &data[pos], sizeof(int));
-        pos += INT_SIZE;
-    }
-    else
-    {
-        type = 0;
-    }
-
-    if (checkBit(data[7], 2))
-    {
-        if (dataSize - pos < FLOAT_SIZE)
-        {
-            return false;
-        }
-        memcpy(&custom1, &data[pos], sizeof(float));
-        pos += FLOAT_SIZE;
-    }
-    else
-    {
-        custom1 = 0;
-    }
-
-    if (checkBit(data[7], 1))
-    {
-        if (dataSize - pos < FLOAT_SIZE)
-        {
-            return false;
-        }
-        memcpy(&custom2, &data[pos], sizeof(float));
-        pos += FLOAT_SIZE;
-    }
-    else
-    {
-        custom2 = 0;
-    }
-
-    if (checkBit(data[7], 0))
-    {
-        if (dataSize - pos < FLOAT_SIZE)
-        {
-            return false;
-        }
-        memcpy(&custom3, &data[pos], sizeof(float));
-        pos += FLOAT_SIZE;
-    }
-    else
-    {
-        custom3 = 0;
-    }
-
-    if (checkBit(data[8], 7))
-    {
-        if (!readString(data, dataSize, pos, rtspKey))
-        {
-            return false;
-        }
-    }
-    else
-    {
-        rtspKey = "";
-    }
-
-    if (checkBit(data[8], 6))
-    {
-        if (!readString(data, dataSize, pos, rtspCert))
-        {
-            return false;
-        }
-    }
-    else
-    {
-        rtspCert = "";
-    }
-
-    if (checkBit(data[8], 5))
-    {
-        if (!readString(data, dataSize, pos, webRtcKey))
-        {
-            return false;
-        }
-    }
-    else
-    {
-        webRtcKey = "";
-    }
-
-    if (checkBit(data[8], 4))
-    {
-        if (!readString(data, dataSize, pos, webRtcCert))
-        {
-            return false;
-        }
-    }
-    else
-    {
-        webRtcCert = "";
-    }
-
-    if (checkBit(data[8], 3))
-    {
-        if (!readString(data, dataSize, pos, hlsKey))
-        {
-            return false;
-        }
-    }
-    else
-    {
-        hlsKey = "";
-    }
-
-    if (checkBit(data[8], 2))
-    {
-        if (!readString(data, dataSize, pos, hlsCert))
-        {
-            return false;
-        }
-    }
-    else
-    {
-        hlsCert = "";
-    }
-
-    if (checkBit(data[8], 1))
-    {
-        if (!readString(data, dataSize, pos, rtmpKey))
-        {
-            return false;
-        }
-    }
-    else
-    {
-        rtmpKey = "";
-    }
-
-    if (checkBit(data[8], 0))
-    {
-        if (!readString(data, dataSize, pos, rtmpCert))
-        {
-            return false;
-        }
-    }
-    else
-    {
-        rtmpCert = "";
-    }
-
-    if (checkBit(data[9], 7))
-    {
-        if (!readString(data, dataSize, pos, rtspEncryption))
-        {
-            return false;
-        }
-    }
-    else
-    {
-        rtspEncryption = "";
-    }
-
-    if (checkBit(data[9], 6))
-    {
-        if (!readString(data, dataSize, pos, webRtcEncryption))
-        {
-            return false;
-        }
-    }
-    else
-    {
-        webRtcEncryption = "";
-    }
-
-    if (checkBit(data[9], 5))
-    {
-        if (!readString(data, dataSize, pos, rtmpEncryption))
-        {
-            return false;
-        }
-    }
-    else
-    {
-        rtmpEncryption = "";
-    }
-
-    if (checkBit(data[9], 4))
-    {
-        if (!readString(data, dataSize, pos, hlsEncryption))
-        {
-            return false;
-        }
-    }
-    else
-    {
-        hlsEncryption = "";
-    }
-
-    if (checkBit(data[9], 3))
-    {
-        if (dataSize - pos < INT_SIZE)
-        {
-            return false;
-        }
-        memcpy(&logLevel, &data[pos], sizeof(int));
-        pos += INT_SIZE;
-    }
-    else
-    {
-        logLevel = 0;
-    }
-
-    if (checkBit(data[9], 2))
-    {
-        if (dataSize - pos < INT_SIZE)
-        {
-            return false;
-        }
-        memcpy(&rtspsPort, &data[pos], sizeof(int));
-        pos += INT_SIZE;
-    }
-    else
-    {
-        rtspsPort = 0;
-    }
-
-    if (checkBit(data[9], 1))
-    {
-        if (dataSize - pos < INT_SIZE)
-        {
-            return false;
-        }
-        memcpy(&rtmpsPort, &data[pos], sizeof(int));
-        pos += INT_SIZE;
-    }
-    else
-    {
-        rtmpsPort = 0;
-    }
-
-    if (checkBit(data[9], 0))
-    {
-        if (!readString(data, dataSize, pos, directStreamType))
-        {
-            return false;
-        }
-    }
-    else
-    {
-        directStreamType = "";
-    }
-
-    if (checkBit(data[10], 7))
-    {
-        if (dataSize - pos < INT_SIZE)
-        {
-            return false;
-        }
-        memcpy(&directStreamBitrateKbps, &data[pos], sizeof(int));
-        pos += INT_SIZE;
-    }
-    else
-    {
-        directStreamBitrateKbps = 0;
-    }
-
-    if (checkBit(data[10], 6))
-    {
-        if (dataSize - pos < INT_SIZE)
-        {
-            return false;
-        }
-        memcpy(&directStreamMaxPayloadSize, &data[pos], sizeof(int));
-        pos += INT_SIZE;
-    }
-    else
-    {
-        directStreamMaxPayloadSize = 0;
-    }
-
-    if (checkBit(data[10], 5))
-    {
-        if (dataSize - pos < INT_SIZE)
-        {
-            return false;
-        }
-        memcpy(&directStreamPacingMode, &data[pos], sizeof(int));
-        pos += INT_SIZE;
-    }
-    else
-    {
-        directStreamPacingMode = 0;
-    }
-
-    if (checkBit(data[10], 4))
-    {
-        if (!readString(data, dataSize, pos, serverStreamType))
-        {
-            return false;
-        }
-    }
-    else
-    {
-        serverStreamType = "";
-    }
-
-    if (checkBit(data[10], 3))
-    {
-        if (dataSize - pos < INT_SIZE)
-        {
-            return false;
-        }
-        memcpy(&multicastTtl, &data[pos], sizeof(int));
-        pos += INT_SIZE;
-    }
-    else
-    {
-        multicastTtl = 0;
-    }
-
-    if (checkBit(data[10], 2))
-    {
-        if (!readString(data, dataSize, pos, securityProfile))
-        {
-            return false;
-        }
-    }
-    else
-    {
-        securityProfile = "";
-    }
-
-    if (checkBit(data[10], 1))
-    {
-        if (!readString(data, dataSize, pos, publicAddress))
-        {
-            return false;
-        }
-    }
-    else
-    {
-        publicAddress = "";
-    }
-
-    if (checkBit(data[10], 0))
-    {
-        if (!readString(data, dataSize, pos, bindAddress))
-        {
-            return false;
-        }
-    }
-    else
-    {
-        bindAddress = "";
-    }
-
-    if (checkBit(data[11], 7))
-    {
-        if (dataSize - pos < INT_SIZE)
-        {
-            return false;
-        }
-        memcpy(&rtpPortMin, &data[pos], sizeof(int));
-        pos += INT_SIZE;
-    }
-    else
-    {
-        rtpPortMin = 0;
-    }
-
-    if (checkBit(data[11], 6))
-    {
-        if (dataSize - pos < INT_SIZE)
-        {
-            return false;
-        }
-        memcpy(&rtpPortMax, &data[pos], sizeof(int));
-        pos += INT_SIZE;
-    }
-    else
-    {
-        rtpPortMax = 0;
-    }
-
-    if (checkBit(data[11], 5))
-    {
-        if (dataSize - pos < INT_SIZE)
-        {
-            return false;
-        }
-        memcpy(&webRtcMediaPort, &data[pos], sizeof(int));
-        pos += INT_SIZE;
-    }
-    else
-    {
-        webRtcMediaPort = 0;
-    }
-
-    if (checkBit(data[11], 4))
-    {
-        if (!readString(data, dataSize, pos, corsAllowedOrigin))
-        {
-            return false;
-        }
-    }
-    else
-    {
-        corsAllowedOrigin = "";
-    }
-
-    if (checkBit(data[11], 3))
-    {
-        if (dataSize - pos < INT_SIZE)
-        {
-            return false;
-        }
-        memcpy(&serverStreamMaxPayloadSize, &data[pos], sizeof(int));
-        pos += INT_SIZE;
-    }
-    else
-    {
-        serverStreamMaxPayloadSize = 0;
-    }
-
-    rollback.commit();
 
     return true;
-}
-
-
-
-void VStreamer::encodeSetParamCommand(
-    uint8_t *data, int &size, VStreamerParam id, float value)
-{
-    if (data == nullptr)
-    {
-        size = 0;
-        return;
-    }
-
-    // Fill header.
-    data[0] = 0x01;
-    data[1] = VSTREAMER_MAJOR_VERSION;
-    data[2] = VSTREAMER_MINOR_VERSION;
-
-    // Fill data.
-    int paramId = static_cast<int>(id);
-    memcpy(&data[3], &paramId, 4);
-    memcpy(&data[7], &value, 4);
-    size = 11;
 }
 
 
 
 void cr::video::VStreamer::encodeSetParamCommand(
-    uint8_t* data, int& size, VStreamerParam id, std::string value)
+        uint8_t* data, int& size, VStreamerParam id, float value)
 {
-    // The encoded size (8 + value.size()) is reported in an int: a value too
-    // long for it is refused before anything is written, instead of wrapping
-    // into a wrong size.
-    if (data == nullptr ||
-        value.size() > static_cast<size_t>(numeric_limits<int>::max() - 8))
-    {
-        size = 0;
-        return;
-    }
-
-    // Fill header. 0x03, NOT 0x02: 0x02 is the params-serialize header, and a
-    // string set-param command sharing it meant decodeCommand would misread a
-    // serialized VStreamerParams snapshot as a garbage string set-param. The
-    // two message families now have disjoint header bytes
-    // (0x00 command, 0x01 numeric param, 0x03 string param, 0x02 params).
-    data[0] = 0x03;
-    data[1] = VSTREAMER_MAJOR_VERSION;
-    data[2] = VSTREAMER_MINOR_VERSION;
-
-    // Fill data.
-    int paramId = static_cast<int>(id);
-    memcpy(&data[3], &paramId, 4);
-    memcpy(&data[7], value.c_str(), value.size() + 1);
-    size = 7 + static_cast<int>(value.size()) + 1;
-}
-
-
-
-void cr::video::VStreamer::encodeCommand(uint8_t *data,
-                                         int &size,
-                                         cr::video::VStreamerCommand id)
-{
+    // The size is 0 unless the command is encoded.
+    size = 0;
     if (data == nullptr)
     {
-        size = 0;
         return;
     }
 
-    // Fill header.
-    data[0] = 0x00;
-    data[1] = VSTREAMER_MAJOR_VERSION;
-    data[2] = VSTREAMER_MINOR_VERSION;
-
-    // Fill data.
-    int commandId = static_cast<int>(id);
-    memcpy(&data[3], &commandId, 4);
-    size = 7;
+    writeCommandHeader(data, SET_PARAM_DATA_TYPE, static_cast<int>(id));
+    std::memcpy(&data[COMMAND_VALUE_POS], &value, VALUE_SIZE);
+    size = SET_PARAM_SIZE;
 }
 
 
 
-int cr::video::VStreamer::decodeCommand(uint8_t *data,
-                                        int size,
-                                        cr::video::VStreamerParam &paramId,
-                                        cr::video::VStreamerCommand &commandId,
-                                        float &value,
-                                        string &strValue)
+void cr::video::VStreamer::encodeSetParamCommand(
+        uint8_t* data, int& size, VStreamerParam id, std::string value)
 {
-    value = 0.0f;
-    strValue = "";
+    // The size is 0 unless the command is encoded. The size of the command
+    // must fit into int, and the value must not contain a NUL character: the
+    // decoder ends the string at the first NUL byte and rejects a command
+    // with bytes after it.
+    size = 0;
+    if (data == nullptr ||
+        value.size() > static_cast<size_t>(
+                std::numeric_limits<int>::max() - SET_STRING_PARAM_MIN_SIZE) ||
+        value.find('\0') != std::string::npos)
+    {
+        return;
+    }
 
-    // Check size.
-    if (data == nullptr || size < 7)
+    writeCommandHeader(data, SET_STRING_PARAM_DATA_TYPE, static_cast<int>(id));
+    std::memcpy(&data[COMMAND_VALUE_POS], value.c_str(), value.size() + 1);
+    size = SET_STRING_PARAM_MIN_SIZE + static_cast<int>(value.size());
+}
+
+
+
+void cr::video::VStreamer::encodeCommand(
+        uint8_t* data, int& size, VStreamerCommand id)
+{
+    // The size is 0 unless the command is encoded.
+    size = 0;
+    if (data == nullptr)
+    {
+        return;
+    }
+
+    writeCommandHeader(data, COMMAND_DATA_TYPE, static_cast<int>(id));
+    size = COMMAND_SIZE;
+}
+
+
+
+int cr::video::VStreamer::decodeCommand(uint8_t* data,
+                                        int size,
+                                        VStreamerParam& paramId,
+                                        VStreamerCommand& commandId,
+                                        float& value,
+                                        std::string& strValue)
+{
+    // Check pointer, minimum size (header and ID) and version.
+    if (data == nullptr || size < COMMAND_SIZE ||
+        data[VERSION_POS] != VSTREAMER_MAJOR_VERSION ||
+        data[VERSION_POS + 1] != VSTREAMER_MINOR_VERSION)
     {
         return -1;
     }
 
-    // Check version.
-    if (data[1] != VSTREAMER_MAJOR_VERSION || data[2] != VSTREAMER_MINOR_VERSION)
-    {
-        return -1;
-    }
+    int id{0};
+    std::memcpy(&id, &data[COMMAND_ID_POS], VALUE_SIZE);
 
-    // Extract data.
-    int id = 0;
-    memcpy(&id, &data[3], 4);
-
-    // Check command type.
-    if (data[0] == 0x00)
+    // Action command: exact size, ID inside the VStreamerCommand range (an
+    // unknown ID is not passed to the implementation).
+    if (data[0] == COMMAND_DATA_TYPE)
     {
-        // Action command is a fixed 7-byte datagram. A longer buffer is a
-        // different message (or a truncated concat), not a COMMAND.
-        if (size != 7)
+        if (size != COMMAND_SIZE || id < MIN_COMMAND_ID || id > MAX_COMMAND_ID)
         {
             return -1;
         }
         commandId = static_cast<VStreamerCommand>(id);
+        value = 0.0f;
+        strValue.clear();
         return 0;
     }
-    else if (data[0] == 0x01)
+
+    // Set param commands: ID inside the VStreamerParam range.
+    if (id < MIN_PARAM_ID || id > MAX_PARAM_ID)
     {
-        // Check size.
-        if (size != 11)
+        return -1;
+    }
+
+    // Set param command with a numeric value: exact size.
+    if (data[0] == SET_PARAM_DATA_TYPE)
+    {
+        if (size != SET_PARAM_SIZE)
         {
             return -1;
         }
-
         paramId = static_cast<VStreamerParam>(id);
-        memcpy(&value, &data[7], 4);
+        std::memcpy(&value, &data[COMMAND_VALUE_POS], VALUE_SIZE);
+        strValue.clear();
         return 1;
     }
-    else if (data[0] == 0x03)
+
+    // Set param command with a string value: the first NUL byte must be the
+    // last byte of the command. Serialized params (data type 0x02) and any
+    // other data type are not commands.
+    if (data[0] != SET_STRING_PARAM_DATA_TYPE ||
+        size < SET_STRING_PARAM_MIN_SIZE)
     {
-        // String set-param. A 0x02 datagram is a params-serialize snapshot, not
-        // a command, and now falls through to the -1 below rather than being
-        // mangled into a string set-param.
-        // Header (3) + param id (4) + at least the null terminator.
-        if (size < 8)
-        {
-            return -1;
-        }
-
-        paramId = static_cast<VStreamerParam>(id);
-
-        // Require an in-range terminator. Silently truncating at 511 bytes
-        // used to accept a payload that was never encoded that way, and a
-        // missing terminator used to swallow whatever followed in the buffer.
-        // size >= 8 here, so remaining is positive and so is the size_t.
-        const int remaining = size - 7;
-        const void* nullPos = memchr(&data[7], 0,
-                                     static_cast<size_t>(remaining));
-        if (nullPos == nullptr)
-        {
-            return -1;
-        }
-        // length < remaining: it fits in an int.
-        const size_t length = static_cast<size_t>(
-            static_cast<const uint8_t*>(nullPos) - &data[7]);
-        if (7 + static_cast<int>(length) + 1 != size)
-        {
-            return -1;
-        }
-        strValue.assign(reinterpret_cast<const char*>(&data[7]), length);
-        return 2;
+        return -1;
+    }
+    const size_t length = static_cast<size_t>(size - SET_STRING_PARAM_MIN_SIZE);
+    if (std::memchr(&data[COMMAND_VALUE_POS], 0, length + 1) != &data[size - 1])
+    {
+        return -1;
     }
 
-    return -1;
+    // Copy the string before the output arguments are changed: an allocation
+    // failure is reported as a decoding failure. The move assignment doesn't
+    // throw.
+    try
+    {
+        const char* begin =
+                reinterpret_cast<const char*>(&data[COMMAND_VALUE_POS]);
+        std::string text(begin, length);
+        strValue = std::move(text);
+    }
+    catch (const std::bad_alloc&)
+    {
+        return -1;
+    }
+    paramId = static_cast<VStreamerParam>(id);
+    value = 0.0f;
+    return 2;
 }
 
 
 
 bool cr::video::VStreamer::decodeAndExecuteCommand(uint8_t* data, int size)
 {
-    // Decode command. Defaults are unused: decodeCommand fills the id that
-    // matches the header, and a decode failure returns before execute/setParam.
-    VStreamerCommand commandId = VStreamerCommand::RESTART;
-    VStreamerParam paramId = VStreamerParam::FIT_MODE;
-    float value = 0.0f;
-    std::string strValue = "";
-    switch (VStreamer::decodeCommand(data, size, paramId, commandId, value, strValue))
+    // Decode command. The decoder checks the size, the version and the IDs.
+    VStreamerParam paramId{VStreamerParam::MODE};
+    VStreamerCommand commandId{VStreamerCommand::RESTART};
+    float value{0.0f};
+    std::string strValue;
+    const int result =
+            decodeCommand(data, size, paramId, commandId, value, strValue);
+
+    // Execute the decoded command.
+    if (result == 0)
     {
-    // Command.
-    case 0:
         return executeCommand(commandId);
-    // Set parameter.
-    case 1:
+    }
+    if (result == 1)
+    {
         return setParam(paramId, value);
-    // Set parameter string.
-    case 2:
-        return setParam(paramId, strValue);
-    default:
-        return false;
+    }
+    if (result == 2)
+    {
+        return setParam(paramId, std::move(strValue));
     }
 
     return false;

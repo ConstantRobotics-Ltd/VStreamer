@@ -1,993 +1,1234 @@
+#include <algorithm>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
 #include <iostream>
+#include <string>
+#include <type_traits>
+#include <vector>
 #include "VStreamer.h"
+#include "VStreamerVersion.h"
 
 
 
-// Link namespaces.
-using namespace cr::video;
-using namespace std;
-
-
-
-// Fill random data.
-static void fillRandomData(VStreamerParams &a)
+namespace
 {
-    a.enable = false;
-    a.width = rand() % 65535 + 1;
-    a.height = rand() % 65535 + 1;
-    a.directStreamIp = "sfspfo9jbjnbjhklvllks";
-    a.rtspPort = rand() % 65535 + 1;
-    a.rtspsPort = rand() % 65535 + 1;
-    a.directStreamPort = rand() % 65535 + 1;
-    a.webRtcPort = rand() % 65535 + 1;
-    a.hlsPort = rand() % 65535 + 1;
-    a.srtPort = rand() % 65535 + 1;
-    a.rtmpPort = rand() % 65535 + 1;
-    a.rtmpsPort = rand() % 65535 + 1;
-    a.metadataPort = rand() % 65535 + 1;
-    a.rtspEnable = true;
-    a.directStreamEnable = true;
-    a.webRtcEnable = false;
-    a.hlsEnable = false;
-    a.srtEnable = true;
-    a.rtmpEnable = true;
-    a.metadataEnable = false;
-    a.rtspMulticastIp = "wpofuihifo";
-    a.rtspMulticastPort = rand() % 65535 + 1;
-    a.user = "slfljkv";
-    a.password = "sddgoihw,";
-    a.suffix = "pisfhcowmfv";
-    a.metadataSuffix = "z.,nfpowe";
-    a.minBitrateKbps = rand() % 65535 + 1;
-    a.maxBitrateKbps = rand() % 65535 + 1;
-    a.bitrateKbps = rand() % 65535 + 1;
-    a.bitrateMode = rand() % 65535 + 1;
-    a.fps = static_cast<float>(rand() % 65535 + 1);
-    a.gop = rand() % 65535 + 1;
-    a.h264Profile = rand() % 65535 + 1;
-    a.jpegQuality = rand() % 65535 + 1;
-    a.codec = "dkgvmkrnjv";
-    a.fitMode = rand() % 65535 + 1;
-    a.cycleTimeUs = rand() % 65535 + 1;
-    a.overlayEnable = true;
-    a.type = rand() % 65535 + 1;
-    a.custom1 = static_cast<float>(rand() % 65535 + 1);
-    a.custom2 = static_cast<float>(rand() % 65535 + 1);
-    a.custom3 = static_cast<float>(rand() % 65535 + 1);
-    a.rtspKey = "dh;skcsf";
-    a.rtspCert = "lkjrkjg";
-    a.webRtcKey = "WERUHUHFE";
-    a.webRtcCert = "erghshiAJ";
-    a.hlsKey = "wqlovf;qb";
-    a.hlsCert = "24kjcnnv";
-    a.rtmpKey = "dkkkkjfkjdkjfkj2134";
-    a.rtmpCert = "wfpomv";
-    a.rtspEncryption = "quyen";
-    a.webRtcEncryption = "l;uoykh";
-    a.rtmpEncryption = "skldfjdf";
-    a.hlsEncryption = "wieufjpowkf";
-    a.logLevel = rand() % 4;
-    const std::string directStreamTypes[] = {"rtp", "mpegts", "mpegts-rtp"};
-    a.directStreamType = directStreamTypes[rand() % 3];
-    a.directStreamBitrateKbps = rand() % 65535 + 1;
-    a.directStreamMaxPayloadSize = rand() % 65535 + 1;
-    a.directStreamPacingMode = rand() % 2;
-    const std::string serverStreamTypes[] = {"rtp", "rtp-klv", "mpegts-rtp-klv"};
-    a.serverStreamType = serverStreamTypes[rand() % 3];
-    a.multicastTtl = rand() % 256;
-    const std::string profiles[] = {"no", "ONVIF", "STRICT_FIPS", "CRA_STRICT"};
-    a.securityProfile = profiles[rand() % 4];
-    a.publicAddress = "203.0.113." + std::to_string(rand() % 256);
-    a.bindAddress = "192.0.2." + std::to_string(rand() % 256);
-    a.rtpPortMin = rand() % 65535;
-    a.rtpPortMax = rand() % 65535;
-    a.webRtcMediaPort = rand() % 65535;
-    a.corsAllowedOrigin = "https://app" + std::to_string(rand() % 100) + ".example";
-    a.serverStreamMaxPayloadSize = rand() % 65535 + 1;
-}
+using cr::video::VStreamer;
+using cr::video::VStreamerCommand;
+using cr::video::VStreamerParam;
+using cr::video::VStreamerParams;
+using cr::video::VStreamerParamsMask;
 
+/// Size of the header of serialized params: data type, version and mask.
+constexpr int HEADER_SIZE{13};
+/// Position of the mask in serialized params.
+constexpr int MASK_POS{3};
+/// Number of VStreamerParams fields (bits of the mask).
+constexpr int FIELDS_NUMBER{69};
+/// Size of the test buffers, bytes.
+constexpr int BUFFER_SIZE{8192};
+/// Value of unused bytes of the test buffers.
+constexpr uint8_t CANARY{0xA5};
+/// Last action command ID.
+constexpr int MAX_COMMAND_ID{4};
+/// Last param ID.
+constexpr int MAX_PARAM_ID{69};
+/// Number of samples of the damaged data campaign.
+constexpr int DAMAGED_SAMPLES{40000};
+/// Name of the JSON file of the test. The file is removed by the test.
+const char* const JSON_FILE_NAME{"TestVStreamerParams.json"};
 
-// Compare params function.
-bool compareParams(VStreamerParams &a, VStreamerParams &b, VStreamerParamsMask* mask = nullptr);
-
-// Copy test.
-bool copyTest();
-
-// Serialize/deserialize test.
-bool serializeDeserializeTest();
-
-/// Serialize/deserialize test with params mask.
-bool serializeDeserializeWithMaskTest();
-
-/// Encode/decode commands test.
-bool encodeDecodeCommandsTest();
-
-/// JSON read/write test.
-bool jsonReadWriteTest();
+/// State of the test random generator. The tests use own deterministic
+/// generator: results must be reproducible on all platforms.
+uint32_t g_randomState{20261017U};
 
 
 
-int main(void)
+/// Get next random number in [0, limit).
+int randomInt(int limit)
 {
-    cout << "#####################################" << endl;
-    cout << "#                                   #" << endl;
-    cout << "# VStreamerParams test              #" << endl;
-    cout << "#                                   #" << endl;
-    cout << "#####################################" << endl;
-    cout << endl;
-
-    int failed = 0;
-
-    cout << "Copy test:" << endl;
-    if (copyTest())
-        cout << "OK" << endl;
-    else
-    {
-        cout << "ERROR" << endl;
-        ++failed;
-    }
-    cout << endl;
-
-    cout << "Serialize/Deserialize test:" << endl;
-    if (serializeDeserializeTest())
-        cout << "OK" << endl;
-    else
-    {
-        cout << "ERROR" << endl;
-        ++failed;
-    }
-    cout << endl;
-
-    cout << "Serialize/Deserialize test with params mask:" << endl;
-    if (serializeDeserializeWithMaskTest())
-        cout << "OK" << endl;
-    else
-    {
-        cout << "ERROR" << endl;
-        ++failed;
-    }
-    cout << endl;
-
-    cout << "Encode/Decode commands test:" << endl;
-    if (encodeDecodeCommandsTest())
-        cout << "OK" << endl;
-    else
-    {
-        cout << "ERROR" << endl;
-        ++failed;
-    }
-    cout << endl;
-
-    cout << "JSON read/write test:" << endl;
-    if (jsonReadWriteTest())
-        cout << "OK" << endl;
-    else
-    {
-        cout << "ERROR" << endl;
-        ++failed;
-    }
-    cout << endl;
-
-    return failed ? 1 : 0;
+    g_randomState = g_randomState * 1664525U + 1013904223U;
+    return static_cast<int>((g_randomState >> 8) %
+                            static_cast<uint32_t>(limit));
 }
 
 
 
-bool compareParams(VStreamerParams &a, VStreamerParams &b, VStreamerParamsMask* mask)
+/// Get random 32 bits.
+uint32_t randomBits()
 {
-    // If mask not initialized then compare all params.
-    VStreamerParamsMask defaultMask;
-    if (mask == nullptr)
-        mask = &defaultMask;
-
-    if (mask->enable && (a.enable != b.enable))
-    {
-        cout << "enable" << endl;
-        return false;
-    }
-    if (mask->width && (a.width != b.width))
-    {
-        cout << "width" << endl;
-        return false;
-    }
-    if (mask->height && (a.height != b.height))
-    {
-        cout << "height" << endl;
-        return false;
-    }
-    if (mask->directStreamIp && (a.directStreamIp != b.directStreamIp))
-    {
-        cout << "directStreamIp" << endl;
-        return false;
-    }
-    if (mask->rtspPort && (a.rtspPort != b.rtspPort))
-    {
-        cout << "rtspPort" << endl;
-        return false;
-    }
-    if (mask->directStreamPort && (a.directStreamPort != b.directStreamPort))
-    {
-        cout << "directStreamPort" << endl;
-        return false;
-    }
-    if (mask->webRtcPort && (a.webRtcPort != b.webRtcPort))
-    {
-        cout << "webRtcPort" << endl;
-        return false;
-    }
-    if (mask->hlsPort && (a.hlsPort != b.hlsPort))
-    {
-        cout << "hlsPort" << endl;
-        return false;
-    }
-    if (mask->srtPort && (a.srtPort != b.srtPort))
-    {
-        cout << "srtPort" << endl;
-        return false;
-    }
-    if (mask->rtmpPort && (a.rtmpPort != b.rtmpPort))
-    {
-        cout << "rtmpPort" << endl;
-        return false;
-    }
-    if (mask->metadataPort && (a.metadataPort != b.metadataPort))
-    {
-        cout << "metadataPort" << endl;
-        return false;
-    }
-    if (mask->rtspEnable && (a.rtspEnable != b.rtspEnable))
-    {
-        cout << "rtspEnable" << endl;
-        return false;
-    }
-    if (mask->directStreamEnable && (a.directStreamEnable != b.directStreamEnable))
-    {
-        cout << "directStreamEnable" << endl;
-        return false;
-    }
-    if (mask->webRtcEnable && (a.webRtcEnable != b.webRtcEnable))
-    {
-        cout << "webRtcEnable" << endl;
-        return false;
-    }
-    if (mask->hlsEnable && (a.hlsEnable != b.hlsEnable))
-    {
-        cout << "hlsEnable" << endl;
-        return false;
-    }
-    if (mask->srtEnable && (a.srtEnable != b.srtEnable))
-    {
-        cout << "srtEnable" << endl;
-        return false;
-    }
-    if (mask->rtmpEnable && (a.rtmpEnable != b.rtmpEnable))
-    {
-        cout << "rtmpEnable" << endl;
-        return false;
-    }
-    if (mask->metadataEnable && (a.metadataEnable != b.metadataEnable))
-    {
-        cout << "metadataEnable" << endl;
-        return false;
-    }
-    if (mask->rtspMulticastIp && (a.rtspMulticastIp != b.rtspMulticastIp))
-    {
-        cout << "rtspMulticastIp" << endl;
-        return false;
-    }
-    if (mask->rtspMulticastPort && (a.rtspMulticastPort != b.rtspMulticastPort))
-    {
-        cout << "rtspMulticastPort" << endl;
-        return false;
-    }
-    if (mask->user && (a.user != b.user))
-    {
-        cout << "user" << endl;
-        return false;
-    }
-    if (mask->password && (a.password != b.password))
-    {
-        cout << "password" << endl;
-        return false;
-    }
-    if (mask->suffix && (a.suffix != b.suffix))
-    {
-        cout << "suffix" << endl;
-        return false;
-    }
-    if (mask->metadataSuffix && (a.metadataSuffix != b.metadataSuffix))
-    {
-        cout << "metadataSuffix" << endl;
-        return false;
-    }
-    if (mask->minBitrateKbps && (a.minBitrateKbps != b.minBitrateKbps))
-    {
-        cout << "minBitrateKbps" << endl;
-        return false;
-    }
-    if (mask->maxBitrateKbps && (a.maxBitrateKbps != b.maxBitrateKbps))
-    {
-        cout << "maxBitrateKbps" << endl;
-        return false;
-    }
-    if (mask->bitrateKbps && (a.bitrateKbps != b.bitrateKbps))
-    {
-        cout << "bitrateKbps" << endl;
-        return false;
-    }
-    if (mask->bitrateMode && (a.bitrateMode != b.bitrateMode))
-    {
-        cout << "bitrateMode" << endl;
-        return false;
-    }
-    if (mask->fps && (a.fps != b.fps))
-    {
-        cout << "fps" << endl;
-        return false;
-    }
-    if (mask->gop && (a.gop != b.gop))
-    {
-        cout << "gop" << endl;
-        return false;
-    }
-    if (mask->h264Profile && (a.h264Profile != b.h264Profile))
-    {
-        cout << "h264Profile" << endl;
-        return false;
-    }
-    if (mask->jpegQuality && (a.jpegQuality != b.jpegQuality))
-    {
-        cout << "jpegQuality" << endl;
-        return false;
-    }
-    if (mask->codec && (a.codec != b.codec))
-    {
-        cout << "codec" << endl;
-        return false;
-    }
-    if (mask->fitMode && (a.fitMode != b.fitMode))
-    {
-        cout << "fitMode" << endl;
-        return false;
-    }
-    if (mask->cycleTimeUs && (a.cycleTimeUs != b.cycleTimeUs))
-    {
-        cout << "cycleTimeUs" << endl;
-        return false;
-    }
-    if (mask->overlayEnable && (a.overlayEnable != b.overlayEnable))    
-    {
-        cout << "overlayEnable" << endl;
-        return false;
-    }
-    if (mask->type && (a.type != b.type))
-    {
-        cout << "type" << endl;
-        return false;
-    }
-    if (mask->custom1 && (a.custom1 != b.custom1))
-    {
-        cout << "custom1" << endl;
-        return false;
-    }
-    if (mask->custom2 && (a.custom2 != b.custom2))
-    {
-        cout << "custom2" << endl;
-        return false;
-    }
-    if (mask->custom3 && (a.custom3 != b.custom3))
-    {
-        cout << "custom3" << endl;
-        return false;
-    }
-    if (mask->rtspKey && (a.rtspKey != b.rtspKey))
-    {
-        cout << "rtspKey" << endl;
-        return false;
-    }
-    if (mask->rtspCert && (a.rtspCert != b.rtspCert))
-    {
-        cout << "rtspCert" << endl;
-        return false;
-    }
-    if (mask->webRtcKey && (a.webRtcKey != b.webRtcKey))
-    {
-        cout << "webRtcKey" << endl;
-        return false;
-    }
-    if (mask->webRtcCert && (a.webRtcCert != b.webRtcCert))
-    {
-        cout << "webRtcCert" << endl;
-        return false;
-    }
-    if (mask->hlsKey && (a.hlsKey != b.hlsKey))
-    {
-        cout << "hlsKey" << endl;
-        return false;
-    }
-    if (mask->hlsCert && (a.hlsCert != b.hlsCert))
-    {
-        cout << "hlsCert" << endl;
-        return false;
-    }
-    if (mask->rtmpKey && (a.rtmpKey != b.rtmpKey))
-    {
-        cout << "rtmpKey" << endl;
-        return false;
-    }
-    if (mask->rtmpCert && (a.rtmpCert != b.rtmpCert))
-    {
-        cout << "rtmpCert" << endl;
-        return false;
-    }
-    if (mask->rtspEncryption && (a.rtspEncryption != b.rtspEncryption))
-    {
-        cout << "rtspEncryption" << endl;
-        return false;
-    }
-    if (mask->webRtcEncryption && (a.webRtcEncryption != b.webRtcEncryption))
-    {
-        cout << "webRtcEncryption" << endl;
-        return false;
-    }
-    if (mask->rtmpEncryption && (a.rtmpEncryption != b.rtmpEncryption))
-    {
-        cout << "rtmpEncryption" << endl;
-        return false;
-    }
-    if (mask->hlsEncryption && (a.hlsEncryption != b.hlsEncryption))
-    {
-        cout << "hlsEncryption" << endl;
-        return false;
-    }
-    if (mask->logLevel && (a.logLevel != b.logLevel))
-    {
-        cout << "logLevel" << endl;
-        return false;
-    }
-    if (mask->rtspsPort && (a.rtspsPort != b.rtspsPort))
-    {
-        cout << "rtspsPort" << endl;
-        return false;
-    }
-    if (mask->rtmpsPort && (a.rtmpsPort != b.rtmpsPort))
-    {
-        cout << "rtmpsPort" << endl;
-        return false;
-    }
-    if (mask->directStreamType && (a.directStreamType != b.directStreamType))
-    {
-        cout << "directStreamType" << endl;
-        return false;
-    }
-    if (mask->directStreamBitrateKbps && (a.directStreamBitrateKbps != b.directStreamBitrateKbps))
-    {
-        cout << "directStreamBitrateKbps" << endl;
-        return false;
-    }
-    if (mask->directStreamMaxPayloadSize && (a.directStreamMaxPayloadSize != b.directStreamMaxPayloadSize))
-    {
-        cout << "directStreamMaxPayloadSize" << endl;
-        return false;
-    }
-    if (mask->directStreamPacingMode && (a.directStreamPacingMode != b.directStreamPacingMode))
-    {
-        cout << "directStreamPacingMode" << endl;
-        return false;
-    }
-    if (mask->serverStreamType && (a.serverStreamType != b.serverStreamType))
-    {
-        cout << "serverStreamType" << endl;
-        return false;
-    }
-    if (mask->multicastTtl && (a.multicastTtl != b.multicastTtl))
-    {
-        cout << "multicastTtl" << endl;
-        return false;
-    }
-    if (mask->securityProfile && (a.securityProfile != b.securityProfile))
-    {
-        cout << "securityProfile" << endl;
-        return false;
-    }
-    if (mask->publicAddress && (a.publicAddress != b.publicAddress))
-    {
-        cout << "publicAddress" << endl;
-        return false;
-    }
-    if (mask->bindAddress && (a.bindAddress != b.bindAddress))
-    {
-        cout << "bindAddress" << endl;
-        return false;
-    }
-    if (mask->rtpPortMin && (a.rtpPortMin != b.rtpPortMin))
-    {
-        cout << "rtpPortMin" << endl;
-        return false;
-    }
-    if (mask->rtpPortMax && (a.rtpPortMax != b.rtpPortMax))
-    {
-        cout << "rtpPortMax" << endl;
-        return false;
-    }
-    if (mask->webRtcMediaPort && (a.webRtcMediaPort != b.webRtcMediaPort))
-    {
-        cout << "webRtcMediaPort" << endl;
-        return false;
-    }
-    if (mask->corsAllowedOrigin && (a.corsAllowedOrigin != b.corsAllowedOrigin))
-    {
-        cout << "corsAllowedOrigin" << endl;
-        return false;
-    }
-    if (mask->serverStreamMaxPayloadSize &&
-        (a.serverStreamMaxPayloadSize != b.serverStreamMaxPayloadSize))
-    {
-        cout << "serverStreamMaxPayloadSize" << endl;
-        return false;
-    }
-    return true;
+    const auto low = static_cast<uint32_t>(randomInt(0x10000));
+    const auto high = static_cast<uint32_t>(randomInt(0x10000));
+    return (high << 16) | low;
 }
+
+
+
+/// Get bits of a float value.
+uint32_t bitsOf(float value)
+{
+    uint32_t bits{0};
+    std::memcpy(&bits, &value, sizeof(bits));
+    return bits;
+}
+
+
+
+/// Get random value of a field.
+void randomValue(bool& value, bool)
+{
+    value = randomInt(2) == 1;
+}
+
+
+
+/// Get random value of a field.
+void randomValue(int& value, bool)
+{
+    const uint32_t bits = randomBits();
+    std::memcpy(&value, &bits, sizeof(value));
+}
+
+
+
+/// Get random value of a field. A float for a JSON test must be finite: JSON
+/// has no NaN and infinity.
+void randomValue(float& value, bool printable)
+{
+    if (printable)
+    {
+        value = static_cast<float>(randomInt(2000000) - 1000000) / 64.0f;
+        return;
+    }
+    const uint32_t bits = randomBits();
+    std::memcpy(&value, &bits, sizeof(value));
+}
+
+
+
+/// Get random value of a field: random length, no NUL characters. A string
+/// for a JSON test is printable ASCII.
+void randomValue(std::string& value, bool printable)
+{
+    const int length = randomInt(8) == 0 ? randomInt(300) : randomInt(24);
+    value.clear();
+    for (int i = 0; i < length; ++i)
+    {
+        const int code = printable ? ' ' + randomInt(95) : 1 + randomInt(255);
+        value.push_back(static_cast<char>(code));
+    }
+}
+
+
+
+/// Call the visitor for every field of VStreamerParams in the order of the
+/// mask bits of the serialized data: visit(name, field, mask flag).
+template <class Visitor>
+void forEachField(Visitor&& visit)
+{
+    using P = VStreamerParams;
+    using M = VStreamerParamsMask;
+    visit("enable", &P::enable, &M::enable);
+    visit("width", &P::width, &M::width);
+    visit("height", &P::height, &M::height);
+    visit("directStreamIp", &P::directStreamIp, &M::directStreamIp);
+    visit("rtspPort", &P::rtspPort, &M::rtspPort);
+    visit("directStreamPort", &P::directStreamPort, &M::directStreamPort);
+    visit("webRtcPort", &P::webRtcPort, &M::webRtcPort);
+    visit("hlsPort", &P::hlsPort, &M::hlsPort);
+    visit("srtPort", &P::srtPort, &M::srtPort);
+    visit("rtmpPort", &P::rtmpPort, &M::rtmpPort);
+    visit("metadataPort", &P::metadataPort, &M::metadataPort);
+    visit("rtspEnable", &P::rtspEnable, &M::rtspEnable);
+    visit("directStreamEnable", &P::directStreamEnable,
+          &M::directStreamEnable);
+    visit("webRtcEnable", &P::webRtcEnable, &M::webRtcEnable);
+    visit("hlsEnable", &P::hlsEnable, &M::hlsEnable);
+    visit("srtEnable", &P::srtEnable, &M::srtEnable);
+    visit("rtmpEnable", &P::rtmpEnable, &M::rtmpEnable);
+    visit("metadataEnable", &P::metadataEnable, &M::metadataEnable);
+    visit("rtspMulticastIp", &P::rtspMulticastIp, &M::rtspMulticastIp);
+    visit("rtspMulticastPort", &P::rtspMulticastPort, &M::rtspMulticastPort);
+    visit("user", &P::user, &M::user);
+    visit("password", &P::password, &M::password);
+    visit("suffix", &P::suffix, &M::suffix);
+    visit("metadataSuffix", &P::metadataSuffix, &M::metadataSuffix);
+    visit("minBitrateKbps", &P::minBitrateKbps, &M::minBitrateKbps);
+    visit("maxBitrateKbps", &P::maxBitrateKbps, &M::maxBitrateKbps);
+    visit("bitrateKbps", &P::bitrateKbps, &M::bitrateKbps);
+    visit("bitrateMode", &P::bitrateMode, &M::bitrateMode);
+    visit("fps", &P::fps, &M::fps);
+    visit("gop", &P::gop, &M::gop);
+    visit("h264Profile", &P::h264Profile, &M::h264Profile);
+    visit("jpegQuality", &P::jpegQuality, &M::jpegQuality);
+    visit("codec", &P::codec, &M::codec);
+    visit("fitMode", &P::fitMode, &M::fitMode);
+    visit("cycleTimeUs", &P::cycleTimeUs, &M::cycleTimeUs);
+    visit("overlayEnable", &P::overlayEnable, &M::overlayEnable);
+    visit("type", &P::type, &M::type);
+    visit("custom1", &P::custom1, &M::custom1);
+    visit("custom2", &P::custom2, &M::custom2);
+    visit("custom3", &P::custom3, &M::custom3);
+    visit("rtspKey", &P::rtspKey, &M::rtspKey);
+    visit("rtspCert", &P::rtspCert, &M::rtspCert);
+    visit("webRtcKey", &P::webRtcKey, &M::webRtcKey);
+    visit("webRtcCert", &P::webRtcCert, &M::webRtcCert);
+    visit("hlsKey", &P::hlsKey, &M::hlsKey);
+    visit("hlsCert", &P::hlsCert, &M::hlsCert);
+    visit("rtmpKey", &P::rtmpKey, &M::rtmpKey);
+    visit("rtmpCert", &P::rtmpCert, &M::rtmpCert);
+    visit("rtspEncryption", &P::rtspEncryption, &M::rtspEncryption);
+    visit("webRtcEncryption", &P::webRtcEncryption, &M::webRtcEncryption);
+    visit("rtmpEncryption", &P::rtmpEncryption, &M::rtmpEncryption);
+    visit("hlsEncryption", &P::hlsEncryption, &M::hlsEncryption);
+    visit("logLevel", &P::logLevel, &M::logLevel);
+    visit("rtspsPort", &P::rtspsPort, &M::rtspsPort);
+    visit("rtmpsPort", &P::rtmpsPort, &M::rtmpsPort);
+    visit("directStreamType", &P::directStreamType, &M::directStreamType);
+    visit("directStreamBitrateKbps", &P::directStreamBitrateKbps,
+          &M::directStreamBitrateKbps);
+    visit("directStreamMaxPayloadSize", &P::directStreamMaxPayloadSize,
+          &M::directStreamMaxPayloadSize);
+    visit("directStreamPacingMode", &P::directStreamPacingMode,
+          &M::directStreamPacingMode);
+    visit("serverStreamType", &P::serverStreamType, &M::serverStreamType);
+    visit("multicastTtl", &P::multicastTtl, &M::multicastTtl);
+    visit("securityProfile", &P::securityProfile, &M::securityProfile);
+    visit("publicAddress", &P::publicAddress, &M::publicAddress);
+    visit("bindAddress", &P::bindAddress, &M::bindAddress);
+    visit("rtpPortMin", &P::rtpPortMin, &M::rtpPortMin);
+    visit("rtpPortMax", &P::rtpPortMax, &M::rtpPortMax);
+    visit("webRtcMediaPort", &P::webRtcMediaPort, &M::webRtcMediaPort);
+    visit("corsAllowedOrigin", &P::corsAllowedOrigin, &M::corsAllowedOrigin);
+    visit("serverStreamMaxPayloadSize", &P::serverStreamMaxPayloadSize,
+          &M::serverStreamMaxPayloadSize);
+}
+
+
+
+/// Check whether two values of a field are equal. Floats are compared by
+/// their bits.
+bool sameValue(bool a, bool b)
+{
+    return a == b;
+}
+
+
+
+/// Check whether two values of a field are equal.
+bool sameValue(int a, int b)
+{
+    return a == b;
+}
+
+
+
+/// Check whether two values of a field are equal (by bits).
+bool sameValue(float a, float b)
+{
+    return bitsOf(a) == bitsOf(b);
+}
+
+
+
+/// Check whether two values of a field are equal.
+bool sameValue(const std::string& a, const std::string& b)
+{
+    return a == b;
+}
+
+
+
+/// Size of a serialized field, bytes.
+int serializedSize(bool)
+{
+    return 1;
+}
+
+
+
+/// Size of a serialized field, bytes.
+int serializedSize(int)
+{
+    return 4;
+}
+
+
+
+/// Size of a serialized field, bytes.
+int serializedSize(float)
+{
+    return 4;
+}
+
+
+
+/// Size of a serialized field, bytes: characters and terminator.
+int serializedSize(const std::string& value)
+{
+    return static_cast<int>(value.size()) + 1;
+}
+
+
+
+/// Fill params with random values.
+void randomParams(VStreamerParams& params, bool printable)
+{
+    forEachField([&](const char*, auto field, bool VStreamerParamsMask::*)
+    {
+        randomValue(params.*field, printable);
+    });
+}
+
+
+
+/// Fill mask with random flags. density: 0 - few flags, 1 - most flags,
+/// 2 - half of the flags.
+void randomMask(VStreamerParamsMask& mask)
+{
+    const int density = randomInt(3);
+    forEachField([&](const char*, auto, bool VStreamerParamsMask::* flag)
+    {
+        const int value = randomInt(8);
+        mask.*flag = density == 0 ? value == 0
+                   : density == 1 ? value != 0
+                   : value < 4;
+    });
+}
+
+
+
+/// Mask with all flags cleared.
+VStreamerParamsMask emptyMask()
+{
+    VStreamerParamsMask mask;
+    forEachField([&](const char*, auto, bool VStreamerParamsMask::* flag)
+    {
+        mask.*flag = false;
+    });
+    return mask;
+}
+
+
+
+/// Compare params: a field selected by the mask must be equal to the input,
+/// a field which is not selected must be zero (if zeroUnselected) or is not
+/// compared. The names of wrong fields are printed.
+bool compareParams(const VStreamerParams& in, const VStreamerParams& out,
+                   const VStreamerParamsMask& mask, bool zeroUnselected)
+{
+    int errors{0};
+    forEachField([&](const char* name, auto field,
+                     bool VStreamerParamsMask::* flag)
+    {
+        using T = std::remove_reference_t<decltype(in.*field)>;
+        const bool selected = mask.*flag;
+        if (!selected && !zeroUnselected)
+        {
+            return;
+        }
+        const T expected = selected ? in.*field : T{};
+        if (!sameValue(expected, out.*field))
+        {
+            std::cout << "Mismatch in field " << name << std::endl;
+            ++errors;
+        }
+    });
+    return errors == 0;
+}
+
+
+
+/// Compare all fields of two params objects.
+bool sameParams(const VStreamerParams& a, const VStreamerParams& b)
+{
+    return compareParams(a, b, VStreamerParamsMask{}, true);
+}
+
+
+
+/// Expected size of serialized params if every selected field fits.
+int expectedSize(const VStreamerParams& params,
+                 const VStreamerParamsMask& mask)
+{
+    int size{HEADER_SIZE};
+    forEachField([&](const char*, auto field, bool VStreamerParamsMask::* flag)
+    {
+        if (mask.*flag)
+        {
+            size += serializedSize(params.*field);
+        }
+    });
+    return size;
+}
+
+
+
+/// Print a failed check and return false.
+bool fail(const std::string& message)
+{
+    std::cout << message << std::endl;
+    return false;
+}
+
+
+
+/// Run one test and print the result.
+bool runTest(const char* title, bool (*test)())
+{
+    std::cout << title << ":" << std::endl;
+    const bool passed = test();
+    std::cout << (passed ? "OK" : "ERROR") << std::endl << std::endl;
+    return passed;
+}
+
+
+
+/// Removes a file of the test when it goes out of scope and reports a failed
+/// removal.
+class FileRemover
+{
+public:
+    /// Constructor. Removes a file left by an earlier run.
+    explicit FileRemover(const char* fileName) : m_fileName(fileName)
+    {
+        static_cast<void>(std::remove(m_fileName));
+    }
+
+    /// Destructor. Removes the file.
+    ~FileRemover()
+    {
+        if (std::remove(m_fileName) != 0)
+        {
+            std::cout << "Can't remove file " << m_fileName << std::endl;
+        }
+    }
+
+    FileRemover(const FileRemover&) = delete;
+    FileRemover(FileRemover&&) = delete;
+    FileRemover& operator=(const FileRemover&) = delete;
+    FileRemover& operator=(FileRemover&&) = delete;
+
+private:
+    /// Name of the file.
+    const char* m_fileName{nullptr};
+};
+
+
+
+/// Video streamer which records the calls of decodeAndExecuteCommand(...).
+class RecordingStreamer : public VStreamer
+{
+public:
+    /// Last called method: 0 - none, 1 - executeCommand, 2 - setParam with
+    /// a float value, 3 - setParam with a string value.
+    int call{0};
+    /// Arguments of the last call.
+    VStreamerCommand commandId{VStreamerCommand::RESTART};
+    VStreamerParam paramId{VStreamerParam::MODE};
+    float value{0.0f};
+    std::string strValue;
+
+    bool initVStreamer(VStreamerParams&, cr::video::VCodec*,
+                       cr::video::VOverlay*) override
+    {
+        return true;
+    }
+
+    bool isVStreamerInit() override
+    {
+        return true;
+    }
+
+    void closeVStreamer() override
+    {
+    }
+
+    bool sendFrame(cr::video::Frame&, uint8_t*, int) override
+    {
+        return true;
+    }
+
+    bool setParam(VStreamerParam id, float newValue) override
+    {
+        call = 2;
+        paramId = id;
+        value = newValue;
+        return true;
+    }
+
+    bool setParam(VStreamerParam id, std::string newValue) override
+    {
+        call = 3;
+        paramId = id;
+        strValue = newValue;
+        return true;
+    }
+
+    void getParams(VStreamerParams&) override
+    {
+    }
+
+    bool executeCommand(VStreamerCommand id) override
+    {
+        call = 1;
+        commandId = id;
+        return true;
+    }
+};
 
 
 
 bool copyTest()
 {
-    // Prepare random params.
     VStreamerParams in;
-    fillRandomData(in);
+    randomParams(in, false);
 
-    // Copy params.
-    VStreamerParams out = in;
-
-    // Compare params.
-    return compareParams(in, out);
-}
-
-
-
-bool serializeDeserializeTest()
-{
-    // Prepare random params.
-    VStreamerParams in;
-    fillRandomData(in);
-
-    // Serialize data.
-    uint8_t data[1024];
-    int size = 0;
-    in.serialize(data, 1024, size);
-
-    cout << "Serialized data size: " << size << " bytes" << endl;
-
-    // Deserialize data.
-    VStreamerParams out;
-    if (!out.deserialize(data, size))
+    // Copy constructor.
+    const VStreamerParams copy = in;
+    if (!sameParams(in, copy))
     {
-        cout << "Can't deserialize data" << endl;
-        return false;
+        return fail("Copy constructor");
     }
 
-    // Compare params.
-    return compareParams(in, out);
-}
-
-
-
-bool encodeDecodeCommandsTest()
-{
-    // Encode command.
-    uint8_t data[1024];
-    int size = 0;
-    float outValue = static_cast<float>(rand() % 20);
-    VStreamer::encodeCommand(data, size, VStreamerCommand::RESTART);
-
-    // Decode command.
-    VStreamerCommand commandId;
-    VStreamerParam paramId;
-    float value = 0.0f;
-    std::string strValue = "";
-    if (VStreamer::decodeCommand(data, size, paramId, commandId, value, strValue) == -1)
+    // Copy assignment.
+    VStreamerParams assigned;
+    assigned = in;
+    if (!sameParams(in, assigned))
     {
-        cout << "Command not decoded" << endl;
-        return false;
+        return fail("Copy assignment");
     }
-
-    // Check ID and value.
-    if (commandId != VStreamerCommand::RESTART)
-    {
-        cout << "not a VStreamerCommand::RESTART" << endl;
-        return false;
-    }
-
-    // Encode param.
-    outValue = static_cast<float>(rand() % 20);
-    VStreamer::encodeSetParamCommand(data, size, VStreamerParam::WIDTH, outValue);
-
-    // Decode command.
-    value = 0.0f;
-    strValue = "";
-    if (VStreamer::decodeCommand(data, size, paramId, commandId, value, strValue) != 1)
-    {
-        cout << "Set param command not decoded" << endl;
-        return false;
-    }
-
-    // Check ID and value.
-    if (paramId != VStreamerParam::WIDTH)
-    {
-        cout << "not a VStreamerParam::WIDTH" << endl;
-        return false;
-    }
-    if (value != outValue)
-    {
-        cout << "not equal value" << endl;
-        return false;
-    }
-
-    // Every numeric parameter added in 3.2 must survive the round trip. The
-    // test used to cover exactly one id, so a new enum entry could be
-    // unencodable and nothing would say so.
-    const VStreamerParam numericIds[] = {
-        VStreamerParam::MULTICAST_TTL,
-        VStreamerParam::RTP_PORT_MIN,
-        VStreamerParam::RTP_PORT_MAX,
-        VStreamerParam::WEBRTC_MEDIA_PORT,
-        VStreamerParam::SERVER_STREAM_MAX_PAYLOAD};
-    for (VStreamerParam id : numericIds)
-    {
-        outValue = static_cast<float>(rand() % 30000);
-        VStreamer::encodeSetParamCommand(data, size, id, outValue);
-        value = 0.0f;
-        strValue = "";
-        if (VStreamer::decodeCommand(data, size, paramId, commandId,
-                                     value, strValue) != 1)
-        {
-            cout << "3.2 numeric param not decoded" << endl;
-            return false;
-        }
-        if (paramId != id || value != outValue)
-        {
-            cout << "3.2 numeric param round trip mismatch" << endl;
-            return false;
-        }
-    }
-
-    // The string parameters, through the string overload.
-    const VStreamerParam stringIds[] = {
-        VStreamerParam::SECURITY_PROFILE,
-        VStreamerParam::PUBLIC_ADDRESS,
-        VStreamerParam::BIND_ADDRESS,
-        VStreamerParam::CORS_ALLOWED_ORIGIN};
-    const std::string stringValues[] = {
-        "CRA_STRICT", "203.0.113.7", "192.0.2.1", "https://app.example"};
-    for (int i = 0; i < 4; ++i)
-    {
-        VStreamer::encodeSetParamCommand(data, size, stringIds[i],
-                                         stringValues[i]);
-        value = 0.0f;
-        strValue = "";
-        // A string set-param decodes as 2, not 1: the return value is the
-        // command KIND (0 command, 1 numeric param, 2 string param), which is
-        // how a caller knows which of value/strValue was filled.
-        if (VStreamer::decodeCommand(data, size, paramId, commandId,
-                                     value, strValue) != 2)
-        {
-            cout << "3.2 string param not decoded" << endl;
-            return false;
-        }
-        if (paramId != stringIds[i] || strValue != stringValues[i])
-        {
-            cout << "3.2 string param round trip mismatch: got '"
-                 << strValue << "'" << endl;
-            return false;
-        }
-    }
-
-    // A params message from a different MINOR version must be refused. This is
-    // the guarantee the wire format rests on: the parameter mask grew from 8
-    // bytes to 10 in 3.2, so a 3.1 message read with 3.2 offsets would decode
-    // garbage into every field rather than fail.
-    {
-        VStreamerParams p;
-        fillRandomData(p);
-        uint8_t buf[4096];
-        int n = 0;
-        if (!p.serialize(buf, sizeof(buf), n))
-        {
-            cout << "params did not serialize" << endl;
-            return false;
-        }
-        VStreamerParams round;
-        if (!round.deserialize(buf, n))
-        {
-            cout << "params did not deserialize" << endl;
-            return false;
-        }
-
-        buf[2] = static_cast<uint8_t>(buf[2] + 1);         // a different minor version
-        VStreamerParams other;
-        if (other.deserialize(buf, n))
-        {
-            cout << "a foreign minor version was accepted" << endl;
-            return false;
-        }
-        buf[2] = static_cast<uint8_t>(buf[2] - 1);
-        buf[1] = static_cast<uint8_t>(buf[1] + 1);         // a different major version
-        if (other.deserialize(buf, n))
-        {
-            cout << "a foreign major version was accepted" << endl;
-            return false;
-        }
-        buf[1] = static_cast<uint8_t>(buf[1] - 1);
-        buf[0] = 0x03;                          // not a params message at all
-        if (other.deserialize(buf, n))
-        {
-            cout << "a foreign header byte was accepted" << endl;
-            return false;
-        }
-
-        // And every truncation of a valid message must be refused rather than
-        // read past its end.
-        buf[0] = 0x02;
-        for (int cut = 0; cut < n; ++cut)
-        {
-            VStreamerParams t;
-            fillRandomData(t);
-            VStreamerParams before = t;
-            if (t.deserialize(buf, cut))
-            {
-                cout << "a truncated params message was accepted at "
-                     << cut << " of " << n << endl;
-                return false;
-            }
-            // A refused message leaves the object exactly as it was.
-            if (!compareParams(before, t))
-            {
-                cout << "a refused params message changed the object at "
-                     << cut << " of " << n << endl;
-                return false;
-            }
-        }
-
-        // A params-serialize snapshot (header 0x02) must NOT be decoded as a
-        // command: string set-param now uses 0x03, so the two families no
-        // longer collide and decodeCommand rejects a params blob.
-        VStreamerParam pid;
-        VStreamerCommand cid;
-        float v = 0.0f;
-        std::string sv;
-        if (VStreamer::decodeCommand(buf, n, pid, cid, v, sv) != -1)
-        {
-            cout << "a params snapshot was misdecoded as a command" << endl;
-            return false;
-        }
-    }
-
-    // encode/decode must refuse a null buffer rather than write through it.
-    {
-        int n = 99;
-        VStreamer::encodeCommand(nullptr, n, VStreamerCommand::RESTART);
-        if (n != 0)
-        {
-            cout << "encodeCommand(nullptr) did not report size 0" << endl;
-            return false;
-        }
-        n = 99;
-        VStreamer::encodeSetParamCommand(nullptr, n, VStreamerParam::WIDTH, 1.0f);
-        if (n != 0)
-        {
-            cout << "encodeSetParamCommand(nullptr, float) did not report size 0"
-                 << endl;
-            return false;
-        }
-        n = 99;
-        VStreamer::encodeSetParamCommand(nullptr, n, VStreamerParam::CODEC,
-                                         std::string("H264"));
-        if (n != 0)
-        {
-            cout << "encodeSetParamCommand(nullptr, string) did not report size 0"
-                 << endl;
-            return false;
-        }
-        if (VStreamer::decodeCommand(nullptr, 11, paramId, commandId,
-                                     value, strValue) != -1)
-        {
-            cout << "decodeCommand(nullptr) was accepted" << endl;
-            return false;
-        }
-    }
-
-    // A string SET_PARAM without a terminator, or with trailing garbage after
-    // the terminator, must be refused. The old decoder stuffed a '\0' at a
-    // 511-byte cap and accepted both.
-    {
-        uint8_t raw[16] = {0x03, 3, 2};
-        int id = static_cast<int>(VStreamerParam::CODEC);
-        memcpy(&raw[3], &id, 4);
-        raw[7] = 'A'; raw[8] = 'B'; raw[9] = 'C';   // no terminator
-        if (VStreamer::decodeCommand(raw, 10, paramId, commandId,
-                                     value, strValue) != -1)
-        {
-            cout << "unterminated string SET_PARAM was accepted" << endl;
-            return false;
-        }
-        raw[7] = 'A'; raw[8] = 0; raw[9] = 'X';     // terminator, then junk
-        if (VStreamer::decodeCommand(raw, 10, paramId, commandId,
-                                     value, strValue) != -1)
-        {
-            cout << "string SET_PARAM with trailing bytes was accepted" << endl;
-            return false;
-        }
-        uint8_t cmd[8] = {0x00, 3, 2};
-        int cid = static_cast<int>(VStreamerCommand::RESTART);
-        memcpy(&cmd[3], &cid, 4);
-        cmd[7] = 0xFF;                              // COMMAND is exactly 7 bytes
-        if (VStreamer::decodeCommand(cmd, 8, paramId, commandId,
-                                     value, strValue) != -1)
-        {
-            cout << "over-long COMMAND was accepted" << endl;
-            return false;
-        }
-    }
-
-    // serialize() used `bufferSize > pos + n`, so a buffer sized exactly to
-    // the payload dropped the last field. A 14-byte buffer must still hold
-    // the header plus one bool.
-    {
-        VStreamerParams p;
-        p.enable = true;
-        VStreamerParamsMask mask{};   // every flag is set by default: only enable fits
-        mask.enable = true;
-        uint8_t tiny[14];
-        int n = 0;
-        if (!p.serialize(tiny, 14, n, &mask) || n != 14)
-        {
-            cout << "exact-size serialize of one bool failed, n=" << n << endl;
-            return false;
-        }
-        VStreamerParams out;
-        if (!out.deserialize(tiny, n) || out.enable != true)
-        {
-            cout << "exact-size serialize/deserialize of enable failed" << endl;
-            return false;
-        }
-    }
-
     return true;
 }
 
 
 
-bool jsonReadWriteTest()
+bool roundTripTest()
 {
-    // Prepare random params.
+    std::vector<uint8_t> data(BUFFER_SIZE);
+    for (int i = 0; i < 3000; ++i)
+    {
+        VStreamerParams in;
+        randomParams(in, false);
+        VStreamerParamsMask mask;
+        const bool useMask = i % 3 != 0;
+        if (useMask)
+        {
+            randomMask(mask);
+        }
+
+        // Serialize.
+        int size{-1};
+        if (!in.serialize(data.data(), BUFFER_SIZE, size,
+                          useMask ? &mask : nullptr))
+        {
+            return fail("Params not serialized");
+        }
+        if (size != expectedSize(in, mask))
+        {
+            return fail("Wrong size " + std::to_string(size) + ", expected " +
+                        std::to_string(expectedSize(in, mask)));
+        }
+
+        // Check the mask bits: field i is bit (7 - i % 8) of mask byte i / 8.
+        int index{0};
+        bool maskOk{true};
+        forEachField([&](const char*, auto, bool VStreamerParamsMask::* flag)
+        {
+            const int bit = 0x80 >> (index % 8);
+            const int byte = MASK_POS + index / 8;
+            const bool isSet = (data[static_cast<size_t>(byte)] & bit) != 0;
+            maskOk = maskOk && isSet == mask.*flag;
+            ++index;
+        });
+        if (!maskOk || data[11] % 8 != 0 || data[12] != 0)
+        {
+            return fail("Wrong mask");
+        }
+
+        // Deserialize into an object with other values.
+        VStreamerParams out;
+        randomParams(out, false);
+        if (!out.deserialize(data.data(), size))
+        {
+            return fail("Params not deserialized");
+        }
+        if (!compareParams(in, out, mask, true))
+        {
+            return fail("Wrong deserialized params");
+        }
+    }
+
+    // All fields with default values.
     VStreamerParams in;
-    fillRandomData(in);
-
-    // Write params to file.
-    cr::utils::ConfigReader inConfig;
-    inConfig.set(in, "vStreamerParams");
-    inConfig.writeToFile("TestVStreamerParams.json");
-
-    // Read params from file.
-    cr::utils::ConfigReader outConfig;
-    if (!outConfig.readFromFile("TestVStreamerParams.json"))
-    {
-        cout << "Can't open config file" << endl;
-        return false;
-    }
-
+    int size{0};
     VStreamerParams out;
-    if (!outConfig.get(out, "vStreamerParams"))
+    randomParams(out, false);
+    if (!in.serialize(data.data(), BUFFER_SIZE, size) ||
+        !out.deserialize(data.data(), size) || !sameParams(in, out))
     {
-        cout << "Can't read params from file" << endl;
-        return false;
+        return fail("Default params round trip");
     }
-
-    // cycleTimeUs is in the JSON as of 3.2 (it used to be binary-only).
-    VStreamerParamsMask mask;
-
-    // Compare params.
-    return compareParams(in, out, &mask);
+    std::cout << "Serialized size of default params: " << size << " bytes"
+              << std::endl;
+    return true;
 }
 
 
 
-bool serializeDeserializeWithMaskTest()
+bool emptyMaskTest()
 {
-    // Prepare random params.
+    // Data with empty mask is the header only: it is valid and resets all
+    // fields.
     VStreamerParams in;
-    fillRandomData(in);
-
-    // Prepare random params mask.
-    VStreamerParamsMask mask;
-    mask.enable = true;
-    mask.width = true;
-    mask.height = false;
-    mask.directStreamIp = true;
-    mask.rtspPort = true;
-    mask.directStreamPort = false;
-    mask.webRtcPort = true;
-    mask.hlsPort = false;
-    mask.srtPort = false;
-    mask.rtmpPort = false;
-    mask.metadataPort = true;
-    mask.rtspEnable = true;
-    mask.directStreamEnable = true;
-    mask.webRtcEnable = false;
-    mask.hlsEnable = false;
-    mask.srtEnable = true;
-    mask.rtmpEnable = true;
-    mask.metadataEnable = false;
-    mask.rtspMulticastIp = true;
-    mask.rtspMulticastPort = false;
-    mask.user = false;
-    mask.password = false;
-    mask.suffix = false;
-    mask.metadataSuffix = true;
-    mask.minBitrateKbps = true;
-    mask.maxBitrateKbps = false;
-    mask.bitrateKbps = true;
-    mask.bitrateMode = false;
-    mask.fps = true;
-    mask.gop = true;
-    mask.h264Profile = true;
-    mask.jpegQuality = false;
-    mask.codec = false;
-    mask.fitMode = false;
-    mask.cycleTimeUs = false;
-    mask.overlayEnable = true;
-    mask.type = true;
-    mask.custom1 = true;
-    mask.custom2 = false;
-    mask.custom3 = true;
-    mask.rtspKey = true;
-    mask.rtspCert = false;
-    mask.webRtcKey = true;
-    mask.webRtcCert = false;
-    mask.hlsKey = true;
-    mask.hlsCert = true;
-    mask.rtmpKey = false;
-    mask.rtmpCert = false;
-    mask.rtspEncryption = false;
-    mask.webRtcEncryption = true;
-    mask.rtmpEncryption = false;
-    mask.hlsEncryption = true;
-    mask.logLevel = true;
-    mask.rtspsPort = true;
-    mask.rtmpsPort = true;
-    mask.directStreamType = true;
-    mask.directStreamBitrateKbps = false;
-    mask.directStreamMaxPayloadSize = true;
-    mask.directStreamPacingMode = false;
-    mask.serverStreamType = true;
-    // The 3.2 parameters, deliberately mixed: a mask test proves nothing if
-    // every new bit is set the same way.
-    mask.multicastTtl = true;
-    mask.securityProfile = false;
-    mask.publicAddress = true;
-    mask.bindAddress = false;
-    mask.rtpPortMin = true;
-    mask.rtpPortMax = true;
-    mask.webRtcMediaPort = false;
-    mask.corsAllowedOrigin = true;
-    mask.serverStreamMaxPayloadSize = false;
-
-    // Encode data.
-    uint8_t data[1024];
-    int size = 0;
-    in.serialize(data, 1024, size, &mask);
-
-    cout << "Serialized data size: " << size << " bytes" << endl;
-
-    // Decode data.
-    VStreamerParams out;
-    if (!out.deserialize(data, size))
+    randomParams(in, false);
+    VStreamerParamsMask mask = emptyMask();
+    uint8_t data[64];
+    int size{0};
+    if (!in.serialize(data, sizeof(data), size, &mask) || size != HEADER_SIZE)
     {
-        cout << "Can't deserialize data" << endl;
-        return false;
+        return fail("Empty mask not serialized");
+    }
+    VStreamerParams out;
+    randomParams(out, false);
+    if (!out.deserialize(data, size) || !compareParams(in, out, mask, true))
+    {
+        return fail("Empty mask not deserialized");
+    }
+    return true;
+}
+
+
+
+bool bufferBoundariesTest()
+{
+    VStreamerParams in;
+    randomParams(in, false);
+    std::vector<uint8_t> data(BUFFER_SIZE, CANARY);
+
+    // nullptr and too small buffers: FALSE, size 0, nothing written.
+    int size{99};
+    if (in.serialize(nullptr, BUFFER_SIZE, size) || size != 0)
+    {
+        return fail("nullptr buffer accepted");
+    }
+    for (int bufferSize = -1; bufferSize < 14; ++bufferSize)
+    {
+        size = 99;
+        if (in.serialize(data.data(), bufferSize, size) || size != 0)
+        {
+            return fail("Too small buffer accepted: " +
+                        std::to_string(bufferSize));
+        }
+    }
+    for (const uint8_t value : data)
+    {
+        if (value != CANARY)
+        {
+            return fail("Rejected call wrote to the buffer");
+        }
     }
 
-    // Compare params.
-    return compareParams(in, out, &mask);
+    // Exact size: the same data. Nothing is written after the data.
+    std::vector<uint8_t> full(BUFFER_SIZE);
+    int fullSize{0};
+    in.serialize(full.data(), BUFFER_SIZE, fullSize);
+    if (!in.serialize(data.data(), fullSize, size) || size != fullSize ||
+        std::memcmp(data.data(), full.data(),
+                    static_cast<size_t>(fullSize)) != 0)
+    {
+        return fail("Exact size buffer");
+    }
+    for (size_t i = static_cast<size_t>(fullSize); i < data.size(); ++i)
+    {
+        if (data[i] != CANARY)
+        {
+            return fail("Data written after the end");
+        }
+    }
+
+    // Every smaller buffer: the fields which don't fit are skipped, the
+    // result is valid and nothing is written after the buffer.
+    for (int bufferSize = 14; bufferSize < fullSize; ++bufferSize)
+    {
+        std::fill(data.begin(), data.end(), CANARY);
+        if (!in.serialize(data.data(), bufferSize, size) || size > bufferSize)
+        {
+            return fail("Smaller buffer: " + std::to_string(bufferSize));
+        }
+        for (size_t i = static_cast<size_t>(bufferSize); i < data.size(); ++i)
+        {
+            if (data[i] != CANARY)
+            {
+                return fail("Data written after the buffer");
+            }
+        }
+        VStreamerParams out;
+        if (!out.deserialize(data.data(), size))
+        {
+            return fail("Data of a smaller buffer not deserialized");
+        }
+    }
+
+    // One byte less than needed: the last field is not serialized.
+    VStreamerParamsMask mask = emptyMask();
+    mask.enable = true;
+    mask.serverStreamMaxPayloadSize = true;
+    in.serialize(data.data(), BUFFER_SIZE, size, &mask);
+    if (size != HEADER_SIZE + 1 + 4)
+    {
+        return fail("Wrong size of two fields");
+    }
+    if (!in.serialize(data.data(), size - 1, size, &mask) ||
+        size != HEADER_SIZE + 1 || data[11] != 0)
+    {
+        return fail("Last field written to a too small buffer");
+    }
+    return true;
+}
+
+
+
+bool stringWithNulTest()
+{
+    // A string with a NUL character is not serialized: the receiver would
+    // read the rest of the string as the next fields.
+    VStreamerParams in;
+    in.user = std::string("ab\0cd", 5);
+    in.password = "secret";
+    VStreamerParamsMask mask = emptyMask();
+    mask.user = true;
+    mask.password = true;
+    uint8_t data[64];
+    int size{0};
+    if (!in.serialize(data, sizeof(data), size, &mask) ||
+        size != HEADER_SIZE + 7)
+    {
+        return fail("Wrong size of data with a NUL character in a string");
+    }
+    VStreamerParams out;
+    if (!out.deserialize(data, size) || !out.user.empty() ||
+        out.password != "secret")
+    {
+        return fail("String with a NUL character serialized");
+    }
+
+    // Command with such a string is not encoded.
+    size = 99;
+    VStreamer::encodeSetParamCommand(data, size, VStreamerParam::USER,
+                                     std::string("ab\0cd", 5));
+    if (size != 0)
+    {
+        return fail("Command with a NUL character in a string encoded");
+    }
+    return true;
+}
+
+
+
+bool invalidDataTest()
+{
+    VStreamerParams in;
+    randomParams(in, false);
+    std::vector<uint8_t> valid(BUFFER_SIZE);
+    int size{0};
+    in.serialize(valid.data(), BUFFER_SIZE, size);
+    valid.resize(static_cast<size_t>(size));
+
+    VStreamerParams out;
+    randomParams(out, false);
+    const VStreamerParams before = out;
+
+    // nullptr, negative and small sizes.
+    if (out.deserialize(nullptr, size) || out.deserialize(valid.data(), -1) ||
+        out.deserialize(valid.data(), 0) ||
+        out.deserialize(valid.data(), HEADER_SIZE - 1))
+    {
+        return fail("nullptr or small size accepted");
+    }
+
+    // Every truncation.
+    for (int cut = 0; cut < size; ++cut)
+    {
+        std::vector<uint8_t> data(valid.begin(), valid.begin() + cut);
+        if (out.deserialize(data.data(), cut))
+        {
+            return fail("Truncated data accepted: " + std::to_string(cut));
+        }
+    }
+
+    // Every value of the header bytes: data type, major and minor version.
+    for (size_t pos = 0; pos < 3; ++pos)
+    {
+        for (int value = 0; value < 256; ++value)
+        {
+            std::vector<uint8_t> data = valid;
+            if (data[pos] == value)
+            {
+                continue;
+            }
+            data[pos] = static_cast<uint8_t>(value);
+            if (out.deserialize(data.data(), size))
+            {
+                return fail("Wrong header accepted");
+            }
+        }
+    }
+
+    // Mask bits of unknown fields.
+    for (int bit = FIELDS_NUMBER; bit < 80; ++bit)
+    {
+        std::vector<uint8_t> data = valid;
+        const int byte = MASK_POS + bit / 8;
+        uint8_t& maskByte = data[static_cast<size_t>(byte)];
+        maskByte = static_cast<uint8_t>(maskByte | (0x80 >> (bit % 8)));
+        if (out.deserialize(data.data(), size))
+        {
+            return fail("Unknown mask bit accepted");
+        }
+    }
+
+    // A string without terminator.
+    {
+        VStreamerParams text;
+        VStreamerParamsMask mask = emptyMask();
+        mask.codec = true;
+        uint8_t data[64];
+        text.serialize(data, sizeof(data), size, &mask);
+        data[size - 1] = 'X';
+        if (out.deserialize(data, size))
+        {
+            return fail("String without terminator accepted");
+        }
+    }
+    if (!sameParams(before, out))
+    {
+        return fail("Rejected data changed the object");
+    }
+
+    // Trailing bytes are ignored.
+    std::vector<uint8_t> longer = valid;
+    longer.push_back(0x11);
+    longer.push_back(0x22);
+    if (!out.deserialize(longer.data(), static_cast<int>(longer.size())) ||
+        !sameParams(in, out))
+    {
+        return fail("Trailing bytes");
+    }
+
+    // Any byte other than 0 of a bool field is true.
+    VStreamerParamsMask mask = emptyMask();
+    mask.enable = true;
+    mask.metadataEnable = true;
+    uint8_t data[64];
+    in.serialize(data, sizeof(data), size, &mask);
+    for (int value = 0; value < 256; ++value)
+    {
+        data[HEADER_SIZE] = static_cast<uint8_t>(value);
+        data[HEADER_SIZE + 1] = static_cast<uint8_t>(255 - value);
+        if (!out.deserialize(data, size) || out.enable != (value != 0) ||
+            out.metadataEnable != (value != 255))
+        {
+            return fail("Wrong bool value");
+        }
+    }
+    return true;
+}
+
+
+
+bool damagedDataTest()
+{
+    // Valid samples with random masks.
+    std::vector<std::vector<uint8_t>> samples;
+    std::vector<uint8_t> buffer(BUFFER_SIZE);
+    for (int i = 0; i < 50; ++i)
+    {
+        VStreamerParams in;
+        randomParams(in, false);
+        VStreamerParamsMask mask;
+        randomMask(mask);
+        int size{0};
+        in.serialize(buffer.data(), BUFFER_SIZE, size, &mask);
+        samples.emplace_back(buffer.begin(), buffer.begin() + size);
+    }
+
+    // Damage the samples: random bytes, random size. The result must be
+    // deterministic, and a rejected call must not change the object.
+    const uint32_t seed = g_randomState;
+    uint32_t results[2]{0, 0};
+    for (uint32_t& result : results)
+    {
+        g_randomState = seed;
+        for (int i = 0; i < DAMAGED_SAMPLES; ++i)
+        {
+            std::vector<uint8_t> data = samples[static_cast<size_t>(
+                    randomInt(static_cast<int>(samples.size())))];
+            const int changes = 1 + randomInt(4);
+            for (int k = 0; k < changes; ++k)
+            {
+                data[static_cast<size_t>(randomInt(
+                        static_cast<int>(data.size())))] =
+                        static_cast<uint8_t>(randomInt(256));
+            }
+            data.resize(static_cast<size_t>(
+                    randomInt(static_cast<int>(data.size()) + 8)));
+            VStreamerParams out;
+            const VStreamerParams before = out;
+            const bool accepted = out.deserialize(
+                    data.data(), static_cast<int>(data.size()));
+            if (!accepted && !sameParams(before, out))
+            {
+                return fail("Rejected damaged data changed the object");
+            }
+            result = result * 31U + (accepted ? 1U : 0U);
+        }
+    }
+    if (results[0] != results[1])
+    {
+        return fail("Damaged data results are not deterministic");
+    }
+    std::cout << DAMAGED_SAMPLES << " damaged samples checked" << std::endl;
+    return true;
+}
+
+
+
+bool commandsTest()
+{
+    uint8_t data[512];
+    int size{0};
+    VStreamerParam paramId{VStreamerParam::MODE};
+    VStreamerCommand commandId{VStreamerCommand::RESTART};
+    float value{0.0f};
+    std::string strValue;
+
+    // Every action command.
+    for (int id = 1; id <= MAX_COMMAND_ID; ++id)
+    {
+        VStreamer::encodeCommand(data, size, static_cast<VStreamerCommand>(id));
+        if (size != 7 ||
+            VStreamer::decodeCommand(data, size, paramId, commandId, value,
+                                     strValue) != 0 ||
+            commandId != static_cast<VStreamerCommand>(id))
+        {
+            return fail("Command " + std::to_string(id));
+        }
+    }
+
+    // Every param with a float and a string value.
+    for (int id = 1; id <= MAX_PARAM_ID; ++id)
+    {
+        const auto param = static_cast<VStreamerParam>(id);
+        float outValue{0.0f};
+        randomValue(outValue, false);
+        VStreamer::encodeSetParamCommand(data, size, param, outValue);
+        if (size != 11 ||
+            VStreamer::decodeCommand(data, size, paramId, commandId, value,
+                                     strValue) != 1 ||
+            paramId != param || !sameValue(value, outValue))
+        {
+            return fail("Float param " + std::to_string(id));
+        }
+
+        std::string outString;
+        randomValue(outString, false);
+        if (outString.size() > 400)
+        {
+            outString.resize(400);
+        }
+        VStreamer::encodeSetParamCommand(data, size, param, outString);
+        if (size != 8 + static_cast<int>(outString.size()) ||
+            VStreamer::decodeCommand(data, size, paramId, commandId, value,
+                                     strValue) != 2 ||
+            paramId != param || strValue != outString)
+        {
+            return fail("String param " + std::to_string(id));
+        }
+    }
+
+    // nullptr buffers.
+    size = 99;
+    VStreamer::encodeCommand(nullptr, size, VStreamerCommand::RESTART);
+    if (size != 0)
+    {
+        return fail("encodeCommand(nullptr)");
+    }
+    size = 99;
+    VStreamer::encodeSetParamCommand(nullptr, size, VStreamerParam::FPS, 1.0f);
+    if (size != 0)
+    {
+        return fail("encodeSetParamCommand(nullptr, float)");
+    }
+    size = 99;
+    VStreamer::encodeSetParamCommand(nullptr, size, VStreamerParam::CODEC,
+                                     std::string("H264"));
+    if (size != 0)
+    {
+        return fail("encodeSetParamCommand(nullptr, string)");
+    }
+
+    // Invalid commands: the output arguments are not changed.
+    uint8_t command[16];
+    int commandSize{0};
+    VStreamer::encodeCommand(command, commandSize, VStreamerCommand::OFF);
+    uint8_t setParam[16];
+    int setParamSize{0};
+    VStreamer::encodeSetParamCommand(setParam, setParamSize,
+                                     VStreamerParam::GOP, 25.0f);
+    uint8_t setString[16];
+    int setStringSize{0};
+    VStreamer::encodeSetParamCommand(setString, setStringSize,
+                                     VStreamerParam::CODEC,
+                                     std::string("HEVC"));
+    std::vector<std::vector<uint8_t>> invalid;
+    // Wrong sizes.
+    for (int n = 0; n < 16; ++n)
+    {
+        if (n != commandSize)
+        {
+            invalid.emplace_back(command, command + n);
+        }
+        if (n != setParamSize)
+        {
+            invalid.emplace_back(setParam, setParam + n);
+        }
+    }
+    // String: no terminator, bytes after the terminator.
+    invalid.emplace_back(setString, setString + setStringSize - 1);
+    {
+        std::vector<uint8_t> longer(setString, setString + setStringSize);
+        longer.push_back('X');
+        invalid.push_back(longer);
+    }
+    // Wrong version and data type.
+    for (const auto* source : {command, setParam, setString})
+    {
+        const int sourceSize = source == command ? commandSize
+                             : source == setParam ? setParamSize
+                             : setStringSize;
+        for (size_t pos = 0; pos < 3; ++pos)
+        {
+            for (int v = 0; v < 256; ++v)
+            {
+                std::vector<uint8_t> d(source, source + sourceSize);
+                if (d[pos] == v || (pos == 0 && v <= 3 && v != 2))
+                {
+                    continue;
+                }
+                d[pos] = static_cast<uint8_t>(v);
+                invalid.push_back(d);
+            }
+        }
+    }
+    // Unknown IDs.
+    for (const int id : {0, -1, MAX_PARAM_ID + 1, 1000, INT32_MIN, INT32_MAX})
+    {
+        for (const auto* source : {command, setParam, setString})
+        {
+            const int sourceSize = source == command ? commandSize
+                                 : source == setParam ? setParamSize
+                                 : setStringSize;
+            std::vector<uint8_t> d(source, source + sourceSize);
+            std::memcpy(&d[3], &id, sizeof(id));
+            invalid.push_back(d);
+        }
+    }
+    {
+        const int id{MAX_COMMAND_ID + 1};
+        std::vector<uint8_t> d(command, command + commandSize);
+        std::memcpy(&d[3], &id, sizeof(id));
+        invalid.push_back(d);
+    }
+    // Serialized params are not a command.
+    {
+        VStreamerParams params;
+        std::vector<uint8_t> d(BUFFER_SIZE);
+        int n{0};
+        params.serialize(d.data(), BUFFER_SIZE, n);
+        d.resize(static_cast<size_t>(n));
+        invalid.push_back(d);
+    }
+    for (std::vector<uint8_t>& d : invalid)
+    {
+        paramId = VStreamerParam::HEIGHT;
+        commandId = VStreamerCommand::ON;
+        value = 7.5f;
+        strValue = "unchanged";
+        if (VStreamer::decodeCommand(d.empty() ? nullptr : d.data(),
+                                     static_cast<int>(d.size()), paramId,
+                                     commandId, value, strValue) != -1)
+        {
+            return fail("Invalid command accepted");
+        }
+        if (paramId != VStreamerParam::HEIGHT ||
+            commandId != VStreamerCommand::ON || !sameValue(value, 7.5f) ||
+            strValue != "unchanged")
+        {
+            return fail("Invalid command changed the output arguments");
+        }
+    }
+    if (VStreamer::decodeCommand(nullptr, 11, paramId, commandId, value,
+                                 strValue) != -1)
+    {
+        return fail("decodeCommand(nullptr)");
+    }
+    std::cout << invalid.size() << " invalid commands checked" << std::endl;
+
+    // decodeAndExecuteCommand(...) calls the right method.
+    RecordingStreamer streamer;
+    if (!streamer.decodeAndExecuteCommand(command, commandSize) ||
+        streamer.call != 1 || streamer.commandId != VStreamerCommand::OFF)
+    {
+        return fail("decodeAndExecuteCommand: command");
+    }
+    if (!streamer.decodeAndExecuteCommand(setParam, setParamSize) ||
+        streamer.call != 2 || streamer.paramId != VStreamerParam::GOP ||
+        !sameValue(streamer.value, 25.0f))
+    {
+        return fail("decodeAndExecuteCommand: float param");
+    }
+    if (!streamer.decodeAndExecuteCommand(setString, setStringSize) ||
+        streamer.call != 3 || streamer.paramId != VStreamerParam::CODEC ||
+        streamer.strValue != "HEVC")
+    {
+        return fail("decodeAndExecuteCommand: string param");
+    }
+    streamer.call = 0;
+    if (streamer.decodeAndExecuteCommand(invalid[0].data(),
+                                         static_cast<int>(invalid[0].size())) ||
+        streamer.decodeAndExecuteCommand(nullptr, 7) || streamer.call != 0)
+    {
+        return fail("decodeAndExecuteCommand: invalid command executed");
+    }
+    return true;
+}
+
+
+
+bool versionTest()
+{
+    const std::string expected = std::to_string(VSTREAMER_MAJOR_VERSION) +
+                                 "." +
+                                 std::to_string(VSTREAMER_MINOR_VERSION) +
+                                 "." +
+                                 std::to_string(VSTREAMER_PATCH_VERSION);
+    std::cout << "VStreamer class version: " << VStreamer::getVersion()
+              << std::endl;
+    if (VStreamer::getVersion() != expected ||
+        expected != VSTREAMER_VERSION)
+    {
+        return fail("Wrong version string");
+    }
+    return true;
+}
+
+
+
+bool jsonTest()
+{
+    const FileRemover remover(JSON_FILE_NAME);
+    for (int i = 0; i < 100; ++i)
+    {
+        VStreamerParams in;
+        randomParams(in, true);
+
+        // File round trip.
+        cr::utils::ConfigReader inConfig;
+        if (!inConfig.set(in, "vStreamerParams") ||
+            !inConfig.writeToFile(JSON_FILE_NAME))
+        {
+            return fail("Can't write params to file");
+        }
+        cr::utils::ConfigReader outConfig;
+        VStreamerParams out;
+        if (!outConfig.readFromFile(JSON_FILE_NAME) ||
+            !outConfig.get(out, "vStreamerParams"))
+        {
+            return fail("Can't read params from file");
+        }
+        if (!sameParams(in, out))
+        {
+            return fail("Wrong params from file");
+        }
+
+        // String round trip.
+        std::string json;
+        VStreamerParams fromString;
+        cr::utils::ConfigReader stringConfig;
+        if (!inConfig.writeToString(json) ||
+            !stringConfig.readFromString(json) ||
+            !stringConfig.get(fromString, "vStreamerParams") ||
+            !sameParams(in, fromString))
+        {
+            return fail("Wrong params from string");
+        }
+    }
+
+    // Invalid documents: rejected, the object is not changed.
+    VStreamerParams in;
+    cr::utils::ConfigReader config;
+    std::string json;
+    config.set(in, "vStreamerParams");
+    config.writeToString(json);
+    const size_t widthPos = json.find("\"width\"");
+    const size_t widthEnd = json.find(',', widthPos);
+    std::string missingKey = json;
+    missingKey.erase(widthPos, widthEnd - widthPos + 1);
+    std::string wrongType = json;
+    wrongType.replace(widthPos, widthEnd - widthPos, "\"width\":\"wide\"");
+    std::string outOfRange = json;
+    outOfRange.replace(widthPos, widthEnd - widthPos, "\"width\":1e20");
+    const std::string documents[]{missingKey, wrongType, outOfRange,
+                                  json.substr(0, json.size() / 2),
+                                  "{\"vStreamerParams\":[]}",
+                                  std::string(100000, '['), ""};
+    for (const std::string& document : documents)
+    {
+        VStreamerParams out;
+        randomParams(out, true);
+        const VStreamerParams before = out;
+        cr::utils::ConfigReader reader;
+        if (reader.readFromString(document) &&
+            reader.get(out, "vStreamerParams"))
+        {
+            return fail("Invalid JSON accepted");
+        }
+        if (!sameParams(before, out))
+        {
+            return fail("Invalid JSON changed the object");
+        }
+    }
+    return true;
+}
+}
+
+
+
+int main()
+{
+    std::cout << "#####################################" << std::endl;
+    std::cout << "#                                   #" << std::endl;
+    std::cout << "# VStreamerParams test              #" << std::endl;
+    std::cout << "#                                   #" << std::endl;
+    std::cout << "#####################################" << std::endl;
+    std::cout << std::endl;
+
+    int failed{0};
+    failed += runTest("Copy test", copyTest) ? 0 : 1;
+    failed += runTest("Serialize/Deserialize round trip test",
+                      roundTripTest) ? 0 : 1;
+    failed += runTest("Empty mask test", emptyMaskTest) ? 0 : 1;
+    failed += runTest("Buffer boundaries test", bufferBoundariesTest) ? 0 : 1;
+    failed += runTest("String with NUL character test",
+                      stringWithNulTest) ? 0 : 1;
+    failed += runTest("Invalid data test", invalidDataTest) ? 0 : 1;
+    failed += runTest("Damaged data test", damagedDataTest) ? 0 : 1;
+    failed += runTest("Encode/Decode commands test", commandsTest) ? 0 : 1;
+    failed += runTest("Version test", versionTest) ? 0 : 1;
+    failed += runTest("JSON read/write test", jsonTest) ? 0 : 1;
+
+    std::cout << (failed == 0 ? "All tests passed" :
+                  std::to_string(failed) + " test(s) failed") << std::endl;
+    return failed == 0 ? 0 : 1;
 }
