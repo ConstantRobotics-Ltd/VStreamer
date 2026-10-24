@@ -13,8 +13,8 @@
 
 namespace
 {
-using Param = cr::video::VStreamerParam;
-using Params = cr::video::VStreamerParams;
+using Param = rapidpixel::VStreamerParam;
+using Params = rapidpixel::VStreamerParams;
 
 /// Limit of float values which can be converted to int. 2^31 is exactly
 /// representable as float, so (-LIMIT <= value < LIMIT) is the exact range
@@ -389,24 +389,24 @@ bool setText(Params& params, Param id, std::string&& value)
 
 
 
-cr::video::CustomVStreamer::CustomVStreamer() = default;
+rapidpixel::CustomVStreamer::CustomVStreamer() = default;
 
 
 
-cr::video::CustomVStreamer::~CustomVStreamer() = default;
+rapidpixel::CustomVStreamer::~CustomVStreamer() = default;
 
 
 
-std::string cr::video::CustomVStreamer::getVersion()
+std::string rapidpixel::CustomVStreamer::getVersion()
 {
     return CUSTOM_VSTREAMER_VERSION;
 }
 
 
 
-bool cr::video::CustomVStreamer::initVStreamer(VStreamerParams& params,
-                                               VCodec*,
-                                               VOverlay*)
+bool rapidpixel::CustomVStreamer::initVStreamer(VStreamerParams& params,
+                                                VCodec*,
+                                                VOverlay*)
 {
     // Check all values before anything is changed.
     if (!isValidParams(params))
@@ -436,7 +436,7 @@ bool cr::video::CustomVStreamer::initVStreamer(VStreamerParams& params,
 
 
 
-bool cr::video::CustomVStreamer::isVStreamerInit()
+bool rapidpixel::CustomVStreamer::isVStreamerInit()
 {
     const std::lock_guard<std::mutex> lock(m_mutex);
     return m_isInit;
@@ -444,7 +444,7 @@ bool cr::video::CustomVStreamer::isVStreamerInit()
 
 
 
-void cr::video::CustomVStreamer::closeVStreamer()
+void rapidpixel::CustomVStreamer::closeVStreamer()
 {
     const std::lock_guard<std::mutex> lock(m_mutex);
     m_isInit = false;
@@ -452,9 +452,9 @@ void cr::video::CustomVStreamer::closeVStreamer()
 
 
 
-bool cr::video::CustomVStreamer::sendFrame(Frame& frame,
-                                           uint8_t* userData,
-                                           int userDataSize)
+bool rapidpixel::CustomVStreamer::sendFrame(Frame& frame,
+                                            uint8_t* userData,
+                                            int userDataSize)
 {
     // Check the frame and the user data: a size without data or a negative
     // size is an error.
@@ -472,7 +472,7 @@ bool cr::video::CustomVStreamer::sendFrame(Frame& frame,
 
 
 
-bool cr::video::CustomVStreamer::setParam(VStreamerParam id, float value)
+bool rapidpixel::CustomVStreamer::setParam(VStreamerParam id, float value)
 {
     const std::lock_guard<std::mutex> lock(m_mutex);
     return setNumber(m_params, id, value);
@@ -480,8 +480,8 @@ bool cr::video::CustomVStreamer::setParam(VStreamerParam id, float value)
 
 
 
-bool cr::video::CustomVStreamer::setParam(VStreamerParam id,
-                                          std::string value)
+bool rapidpixel::CustomVStreamer::setParam(VStreamerParam id,
+                                           std::string value)
 {
     const std::lock_guard<std::mutex> lock(m_mutex);
     return setText(m_params, id, std::move(value));
@@ -489,7 +489,7 @@ bool cr::video::CustomVStreamer::setParam(VStreamerParam id,
 
 
 
-void cr::video::CustomVStreamer::getParams(VStreamerParams& params)
+void rapidpixel::CustomVStreamer::getParams(VStreamerParams& params)
 {
     const std::lock_guard<std::mutex> lock(m_mutex);
     params = m_params;
@@ -497,7 +497,7 @@ void cr::video::CustomVStreamer::getParams(VStreamerParams& params)
 
 
 
-bool cr::video::CustomVStreamer::executeCommand(VStreamerCommand id)
+bool rapidpixel::CustomVStreamer::executeCommand(VStreamerCommand id)
 {
     const std::lock_guard<std::mutex> lock(m_mutex);
     switch (id)

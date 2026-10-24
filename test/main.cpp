@@ -13,11 +13,11 @@
 
 namespace
 {
-using cr::video::VStreamer;
-using cr::video::VStreamerCommand;
-using cr::video::VStreamerParam;
-using cr::video::VStreamerParams;
-using cr::video::VStreamerParamsMask;
+using rapidpixel::VStreamer;
+using rapidpixel::VStreamerCommand;
+using rapidpixel::VStreamerParam;
+using rapidpixel::VStreamerParams;
+using rapidpixel::VStreamerParamsMask;
 
 /// Size of the header of serialized params: data type, version and mask.
 constexpr int HEADER_SIZE{13};
@@ -429,8 +429,8 @@ public:
     float value{0.0f};
     std::string strValue;
 
-    bool initVStreamer(VStreamerParams&, cr::video::VCodec*,
-                       cr::video::VOverlay*) override
+    bool initVStreamer(VStreamerParams&, rapidpixel::VCodec*,
+                       rapidpixel::VOverlay*) override
     {
         return true;
     }
@@ -444,7 +444,7 @@ public:
     {
     }
 
-    bool sendFrame(cr::video::Frame&, uint8_t*, int) override
+    bool sendFrame(rapidpixel::Frame&, uint8_t*, int) override
     {
         return true;
     }
@@ -1134,13 +1134,13 @@ bool jsonTest()
         randomParams(in, true);
 
         // File round trip.
-        cr::utils::ConfigReader inConfig;
+        rapidpixel::ConfigReader inConfig;
         if (!inConfig.set(in, "vStreamerParams") ||
             !inConfig.writeToFile(JSON_FILE_NAME))
         {
             return fail("Can't write params to file");
         }
-        cr::utils::ConfigReader outConfig;
+        rapidpixel::ConfigReader outConfig;
         VStreamerParams out;
         if (!outConfig.readFromFile(JSON_FILE_NAME) ||
             !outConfig.get(out, "vStreamerParams"))
@@ -1155,7 +1155,7 @@ bool jsonTest()
         // String round trip.
         std::string json;
         VStreamerParams fromString;
-        cr::utils::ConfigReader stringConfig;
+        rapidpixel::ConfigReader stringConfig;
         if (!inConfig.writeToString(json) ||
             !stringConfig.readFromString(json) ||
             !stringConfig.get(fromString, "vStreamerParams") ||
@@ -1167,7 +1167,7 @@ bool jsonTest()
 
     // Invalid documents: rejected, the object is not changed.
     VStreamerParams in;
-    cr::utils::ConfigReader config;
+    rapidpixel::ConfigReader config;
     std::string json;
     config.set(in, "vStreamerParams");
     config.writeToString(json);
@@ -1188,7 +1188,7 @@ bool jsonTest()
         VStreamerParams out;
         randomParams(out, true);
         const VStreamerParams before = out;
-        cr::utils::ConfigReader reader;
+        rapidpixel::ConfigReader reader;
         if (reader.readFromString(document) &&
             reader.get(out, "vStreamerParams"))
         {

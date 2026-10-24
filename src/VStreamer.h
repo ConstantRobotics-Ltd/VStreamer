@@ -8,9 +8,7 @@
 
 
 
-namespace cr
-{
-namespace video
+namespace rapidpixel
 {
 /**
  * @brief VStreamer params mask structure.
@@ -900,5 +898,16 @@ protected:
      */
     VStreamer& operator=(VStreamer&& src) = default;
 };
+}
+
+
+
+// Compatibility: the names of namespace rapidpixel are also available in
+// namespace cr::video.
+namespace cr
+{
+namespace video
+{
+using namespace ::rapidpixel;
 }
 }

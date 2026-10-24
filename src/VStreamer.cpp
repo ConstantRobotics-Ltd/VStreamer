@@ -63,25 +63,25 @@ constexpr int FIELDS_NUMBER{69};
 /// Number of bits of the mask.
 constexpr int MASK_BITS_NUMBER{PARAMS_MASK_SIZE * BITS_PER_BYTE};
 static_assert(FIELDS_NUMBER <= MASK_BITS_NUMBER, "mask is too small");
-static_assert(sizeof(cr::video::VStreamerParamsMask) == FIELDS_NUMBER,
+static_assert(sizeof(rapidpixel::VStreamerParamsMask) == FIELDS_NUMBER,
               "every field of VStreamerParamsMask must be in the field table");
 
 /// First action command ID (VStreamerCommand).
 constexpr int MIN_COMMAND_ID{
-        static_cast<int>(cr::video::VStreamerCommand::RESTART)};
+        static_cast<int>(rapidpixel::VStreamerCommand::RESTART)};
 /// Last action command ID (VStreamerCommand).
 constexpr int MAX_COMMAND_ID{
-        static_cast<int>(cr::video::VStreamerCommand::GENERATE_KEYFRAME)};
+        static_cast<int>(rapidpixel::VStreamerCommand::GENERATE_KEYFRAME)};
 /// First param ID (VStreamerParam).
-constexpr int MIN_PARAM_ID{static_cast<int>(cr::video::VStreamerParam::MODE)};
+constexpr int MIN_PARAM_ID{static_cast<int>(rapidpixel::VStreamerParam::MODE)};
 /// Last param ID (VStreamerParam).
 constexpr int MAX_PARAM_ID{static_cast<int>(
-        cr::video::VStreamerParam::SERVER_STREAM_MAX_PAYLOAD)};
+        rapidpixel::VStreamerParam::SERVER_STREAM_MAX_PAYLOAD)};
 
 // VStreamerParams::deserialize(...) assigns the decoded object at the end:
 // the assignment must not throw, so the object is never half changed.
 static_assert(std::is_nothrow_move_assignable<
-              cr::video::VStreamerParams>::value,
+              rapidpixel::VStreamerParams>::value,
               "move assignment of VStreamerParams must not throw");
 
 
@@ -107,12 +107,12 @@ struct FieldRef
     /// Type of the field.
     FieldType type{FieldType::FLAG};
     /// Flag of the field in VStreamerParamsMask.
-    bool cr::video::VStreamerParamsMask::* selected{nullptr};
+    bool rapidpixel::VStreamerParamsMask::* selected{nullptr};
 };
 
 
 
-using Mask = cr::video::VStreamerParamsMask;
+using Mask = rapidpixel::VStreamerParamsMask;
 
 
 
@@ -151,7 +151,7 @@ FieldRef field(std::string& value, bool Mask::* selected)
 /// Get the table of VStreamerParams fields in the order they are stored in
 /// serialized data: field i has bit (7 - i % 8) of mask byte i / 8.
 std::array<FieldRef, FIELDS_NUMBER> makeFieldTable(
-        cr::video::VStreamerParams& p)
+        rapidpixel::VStreamerParams& p)
 {
     return {{
         field(p.enable, &Mask::enable),
@@ -377,18 +377,18 @@ void writeCommandHeader(uint8_t* data, uint8_t dataType, int id)
 
 
 
-cr::video::VStreamer::~VStreamer() = default;
+rapidpixel::VStreamer::~VStreamer() = default;
 
 
 
-std::string cr::video::VStreamer::getVersion()
+std::string rapidpixel::VStreamer::getVersion()
 {
     return VSTREAMER_VERSION;
 }
 
 
 
-bool cr::video::VStreamerParams::serialize(
+bool rapidpixel::VStreamerParams::serialize(
         uint8_t* data, int bufferSize, int& size, VStreamerParamsMask* mask)
 {
     // The size is 0 unless the params are serialized.
@@ -445,7 +445,7 @@ bool cr::video::VStreamerParams::serialize(
 
 
 
-bool cr::video::VStreamerParams::deserialize(uint8_t* data, int dataSize)
+bool rapidpixel::VStreamerParams::deserialize(uint8_t* data, int dataSize)
 {
     // Check pointer and data size: the header must be complete.
     if (data == nullptr || dataSize < PARAMS_HEADER_SIZE)
@@ -512,7 +512,7 @@ bool cr::video::VStreamerParams::deserialize(uint8_t* data, int dataSize)
 
 
 
-void cr::video::VStreamer::encodeSetParamCommand(
+void rapidpixel::VStreamer::encodeSetParamCommand(
         uint8_t* data, int& size, VStreamerParam id, float value)
 {
     // The size is 0 unless the command is encoded.
@@ -529,7 +529,7 @@ void cr::video::VStreamer::encodeSetParamCommand(
 
 
 
-void cr::video::VStreamer::encodeSetParamCommand(
+void rapidpixel::VStreamer::encodeSetParamCommand(
         uint8_t* data, int& size, VStreamerParam id, std::string value)
 {
     // The size is 0 unless the command is encoded. The size of the command
@@ -552,7 +552,7 @@ void cr::video::VStreamer::encodeSetParamCommand(
 
 
 
-void cr::video::VStreamer::encodeCommand(
+void rapidpixel::VStreamer::encodeCommand(
         uint8_t* data, int& size, VStreamerCommand id)
 {
     // The size is 0 unless the command is encoded.
@@ -568,12 +568,12 @@ void cr::video::VStreamer::encodeCommand(
 
 
 
-int cr::video::VStreamer::decodeCommand(uint8_t* data,
-                                        int size,
-                                        VStreamerParam& paramId,
-                                        VStreamerCommand& commandId,
-                                        float& value,
-                                        std::string& strValue)
+int rapidpixel::VStreamer::decodeCommand(uint8_t* data,
+                                         int size,
+                                         VStreamerParam& paramId,
+                                         VStreamerCommand& commandId,
+                                         float& value,
+                                         std::string& strValue)
 {
     // Check pointer, minimum size (header and ID) and version.
     if (data == nullptr || size < COMMAND_SIZE ||
@@ -654,7 +654,7 @@ int cr::video::VStreamer::decodeCommand(uint8_t* data,
 
 
 
-bool cr::video::VStreamer::decodeAndExecuteCommand(uint8_t* data, int size)
+bool rapidpixel::VStreamer::decodeAndExecuteCommand(uint8_t* data, int size)
 {
     // Decode command. The decoder checks the size, the version and the IDs.
     VStreamerParam paramId{VStreamerParam::MODE};

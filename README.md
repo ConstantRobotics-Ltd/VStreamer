@@ -108,9 +108,7 @@ src ------------------------------ Folder with source code of the library.
 The **VStreamer** interface class is declared in the **VStreamer.h** file. Class declaration:
 
 ```cpp
-namespace cr
-{
-namespace video
+namespace rapidpixel
 {
 class VStreamer
 {
@@ -189,7 +187,6 @@ protected:
     VStreamer& operator=(VStreamer&& src) = default;
 };
 }
-}
 ```
 
 
@@ -205,7 +202,7 @@ static std::string getVersion();
 The method can be used without a **VStreamer** class instance:
 
 ```cpp
-std::cout << "VStreamer class version: " << cr::video::VStreamer::getVersion()
+std::cout << "VStreamer class version: " << rapidpixel::VStreamer::getVersion()
           << std::endl;
 ```
 
@@ -373,8 +370,8 @@ int size = 0;
 // Parameter value.
 const float outValue = 10.0f;
 // Encode command.
-cr::video::VStreamer::encodeSetParamCommand(
-        data, size, cr::video::VStreamerParam::CUSTOM1, outValue);
+rapidpixel::VStreamer::encodeSetParamCommand(
+        data, size, rapidpixel::VStreamerParam::CUSTOM1, outValue);
 if (size == 0)
 {
     std::cout << "Command not encoded" << std::endl;
@@ -405,8 +402,8 @@ uint8_t data[7];
 // Size of encoded data.
 int size = 0;
 // Encode command.
-cr::video::VStreamer::encodeCommand(
-        data, size, cr::video::VStreamerCommand::RESTART);
+rapidpixel::VStreamer::encodeCommand(
+        data, size, rapidpixel::VStreamerCommand::RESTART);
 if (size == 0)
 {
     std::cout << "Command not encoded" << std::endl;
@@ -1181,7 +1178,7 @@ Example without parameters mask:
 
 ```cpp
 // Prepare params.
-cr::video::VStreamerParams in;
+rapidpixel::VStreamerParams in;
 in.directStreamIp = "alsfghljb";
 in.directStreamPort = 0;
 
@@ -1199,12 +1196,12 @@ Example with parameters mask:
 
 ```cpp
 // Prepare parameters.
-cr::video::VStreamerParams in;
+rapidpixel::VStreamerParams in;
 in.directStreamIp = "alsfghljb";
 in.directStreamPort = 0;
 
 // Prepare parameters mask.
-cr::video::VStreamerParamsMask mask;
+rapidpixel::VStreamerParamsMask mask;
 mask.directStreamPort = false; // Exclude directStreamPort. Others by default.
 
 // Serialize parameters.
@@ -1251,7 +1248,7 @@ Example:
 
 ```cpp
 // Serialize parameters.
-cr::video::VStreamerParams in;
+rapidpixel::VStreamerParams in;
 uint8_t data[1024];
 int size = 0;
 if (!in.serialize(data, sizeof(data), size))
@@ -1261,7 +1258,7 @@ if (!in.serialize(data, sizeof(data), size))
 std::cout << "Serialized data size: " << size << " bytes" << std::endl;
 
 // Deserialize parameters.
-cr::video::VStreamerParams out;
+rapidpixel::VStreamerParams out;
 if (!out.deserialize(data, size))
 {
     std::cout << "Can't deserialize data" << std::endl;
@@ -1276,8 +1273,8 @@ The **VStreamer** library depends on the **ConfigReader** library which provides
 
 ```cpp
 // Write params to file.
-cr::video::VStreamerParams in;
-cr::utils::ConfigReader inConfig;
+rapidpixel::VStreamerParams in;
+rapidpixel::ConfigReader inConfig;
 if (!inConfig.set(in, "vStreamerParams") ||
     !inConfig.writeToFile("TestVStreamerParams.json"))
 {
@@ -1285,8 +1282,8 @@ if (!inConfig.set(in, "vStreamerParams") ||
 }
 
 // Read params from file.
-cr::utils::ConfigReader outConfig;
-cr::video::VStreamerParams out;
+rapidpixel::ConfigReader outConfig;
+rapidpixel::VStreamerParams out;
 if (!outConfig.readFromFile("TestVStreamerParams.json") ||
     !outConfig.get(out, "vStreamerParams"))
 {
@@ -1577,9 +1574,7 @@ The library doesn't use SIMD instructions or CPU specific code. The library, the
 The **VStreamer** class provides only an interface, data structures, and methods for encoding and decoding commands and params. To create your own implementation of the video streamer, you must include the VStreamer repository in your project (see [Build and connect to your project](#build-and-connect-to-your-project) section). The catalogue **example** (see [Library files](#library-files) section) includes an example of the design of the custom video streamer. You must implement all the methods of the VStreamer interface class. The methods **setParam(...)**, **getParams(...)** and **executeCommand(...)** must be thread-safe, and every value which comes from outside (**initVStreamer(...)**, **setParam(...)**, decoded commands) must be checked before it is used. The example keeps the parameters under a mutex, rejects a value which is not valid (NaN, infinity, a value out of the range of the parameter, an unknown string value, text with control characters) and doesn't change the parameter in this case. Custom video streamer class declaration:
 
 ```cpp
-namespace cr
-{
-namespace video
+namespace rapidpixel
 {
 /// Custom video streamer class.
 class CustomVStreamer : public VStreamer
@@ -1637,6 +1632,5 @@ private:
     /// Mutex to protect m_params and m_isInit.
     std::mutex m_mutex;
 };
-}
 }
 ```

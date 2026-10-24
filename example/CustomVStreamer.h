@@ -6,9 +6,7 @@
 
 
 
-namespace cr
-{
-namespace video
+namespace rapidpixel
 {
 /**
  * @brief Custom video streamer class: example of the VStreamer interface
@@ -149,5 +147,4 @@ private:
     /// Mutex to protect m_params and m_isInit.
     std::mutex m_mutex;
 };
-}
 }
